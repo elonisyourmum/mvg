@@ -14,47 +14,51 @@
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{
     font-family:var(--sys);background:var(--bg);color:var(--ink);
-    padding:2.2vmin 2.8vmin 3vmin;overflow-y:auto;min-height:100vh;user-select:none;
-    -webkit-font-smoothing:antialiased;letter-spacing:.005em;
+    padding:1.8vmin 2.4vmin 2vmin;overflow-y:auto;min-height:100vh;user-select:none;
+    -webkit-font-smoothing:antialiased;
   }
   .topbar{
     display:flex;align-items:center;gap:1.2vmin;
-    padding-bottom:1.4vmin;margin-bottom:1.8vmin;
+    padding-bottom:1.1vmin;margin-bottom:1.4vmin;
     border-bottom:1px solid var(--line);
     position:sticky;top:0;background:var(--bg);z-index:5;
   }
   .logo{background:var(--mvv);color:#fff;font-weight:700;
-        font-size:clamp(.8rem,2.7vmin,1.1rem);line-height:1;letter-spacing:.02em;
-        padding:.32em .5em;border-radius:8px;}
-  .topbar h1{font-size:clamp(.85rem,2.7vmin,1.12rem);font-weight:600;}
-  .topbar .clock{margin-left:auto;color:var(--muted);font-size:clamp(.85rem,2.7vmin,1.1rem);
+        font-size:clamp(.78rem,2.6vmin,1.05rem);letter-spacing:.02em;
+        padding:.3em .48em;border-radius:7px;line-height:1;}
+  .topbar h1{font-size:clamp(.82rem,2.6vmin,1.08rem);font-weight:600;}
+  .topbar .clock{margin-left:auto;color:var(--muted);font-size:clamp(.82rem,2.6vmin,1.05rem);
                  font-weight:500;font-variant-numeric:tabular-nums;}
 
-  .board{display:flex;flex-direction:column;gap:1.3vmin;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
-        padding:1.3vmin 1.6vmin .8vmin;}
-  .station{display:flex;align-items:center;gap:.5em;font-weight:600;
-           font-size:clamp(.92rem,2.8vmin,1.18rem);margin-bottom:.7vmin;}
+  .board{display:flex;flex-direction:column;gap:1vmin;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+        padding:1vmin 1.4vmin .5vmin;}
+  .station{font-weight:600;font-size:clamp(.88rem,2.7vmin,1.12rem);margin-bottom:.5vmin;}
 
-  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.8rem;
-       padding:.62vmin 0;}
+  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.7rem;
+       padding:.48vmin 0;}
   .row + .row{border-top:1px solid var(--line);}
-  .badge{color:#fff;border-radius:7px;font-weight:700;
-         padding:.16em .5em;min-width:2.4em;text-align:center;
-         font-size:clamp(.74rem,2.3vmin,.98rem);letter-spacing:.01em;}
-  .dest{font-size:clamp(.84rem,2.6vmin,1.08rem);font-weight:400;color:#d6dbe1;
-        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .time{display:inline-flex;align-items:baseline;gap:.25em;white-space:nowrap;}
-  .num{font-size:clamp(.95rem,2.9vmin,1.22rem);font-weight:600;color:var(--ink);
-       font-variant-numeric:tabular-nums;}
-  .time.soon .num{color:var(--soon);}
-  .unit{font-size:clamp(.72rem,2.1vmin,.85rem);color:var(--muted);font-weight:500;}
-  .delay{color:var(--soon);font-size:.74em;font-weight:600;margin-left:.15em;}
 
-  .empty,.err{color:var(--muted);font-size:clamp(.78rem,2.3vmin,.95rem);padding:.5vmin 0;}
+  .badge{color:#fff;border-radius:6px;font-weight:700;
+         padding:.13em .44em;min-width:2.3em;text-align:center;
+         font-size:clamp(.72rem,2.2vmin,.94rem);letter-spacing:.01em;}
+  .dest{font-size:clamp(.8rem,2.5vmin,1.04rem);font-weight:400;color:#d6dbe1;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  /* Zeitspalte: Zahl links, rechts gestapelt (Verspätung oben, "min" unten) */
+  .tcell{display:flex;align-items:flex-end;justify-content:flex-end;gap:.22em;
+         min-width:4.6em;}
+  .tnum{font-size:clamp(.9rem,2.8vmin,1.15rem);font-weight:700;
+        color:var(--ink);font-variant-numeric:tabular-nums;line-height:1;}
+  .tcell.soon .tnum{color:var(--soon);}
+  .tright{display:flex;flex-direction:column;align-items:flex-start;line-height:1;}
+  .tdel{font-size:.6em;color:var(--soon);font-weight:700;line-height:1.1;}
+  .tunit{font-size:.68em;color:var(--muted);font-weight:500;line-height:1.3;}
+
+  .empty,.err{color:var(--muted);font-size:clamp(.76rem,2.2vmin,.92rem);padding:.4vmin 0;}
   .err{color:var(--soon);}
-  .updated{text-align:right;color:var(--muted);font-size:.72rem;margin-top:1.2vmin;
-           font-variant-numeric:tabular-nums;opacity:.7;}
+  .updated{text-align:right;color:var(--muted);font-size:.7rem;margin-top:.8vmin;
+           font-variant-numeric:tabular-nums;opacity:.6;}
 </style>
 </head>
 <body>
@@ -75,7 +79,7 @@ const WEGE = [
 ];
 
 const PRIO_UBAHN = true;
-const PRO_WEG    = 6;
+const PRO_WEG    = 4;   // 4 pro Station → alles sichtbar ohne scrollen
 const INTERVALL  = 30000;
 
 const API = "https://www.mvg.de/api/bgw-pt/v3";
@@ -110,7 +114,7 @@ async function abfahrten(id){ return await holen(`${API}/departures?globalId=${i
 
 function matcht(dep,weg){
   const label=(dep.label||"").toUpperCase();
-  const ziel =(dep.destination||"").toLowerCase();
+  const ziel=(dep.destination||"").toLowerCase();
   if(weg.filterLine){
     const f=weg.filterLine.toUpperCase().replace("TRAM ","").replace("BUS ","").trim();
     if(!label.startsWith(f)) return false;
@@ -119,6 +123,15 @@ function matcht(dep,weg){
   return true;
 }
 function minuten(dep){ return Math.round(((dep.realtimeDepartureTime||dep.plannedDepartureTime)-Date.now())/60000); }
+
+function zeitHtml(m, delay){
+  if(m<=0) return `<span class="tcell soon"><span class="tnum">jetzt</span></span>`;
+  const delHtml = delay>0 ? `<span class="tdel">+${delay}</span>` : "";
+  return `<span class="tcell ${m<=2?'soon':''}">
+    <span class="tnum">${m}</span>
+    <span class="tright">${delHtml}<span class="tunit">min</span></span>
+  </span>`;
+}
 
 async function renderWeg(weg){
   const el=document.createElement("div");el.className="card";
@@ -133,18 +146,16 @@ async function renderWeg(weg){
       return minuten(a)-minuten(b);
     });
     deps=deps.slice(0,PRO_WEG);
-    if(deps.length===0){ el.innerHTML+=`<div class="empty">Keine passenden Abfahrten</div>`; }
+    if(deps.length===0) el.innerHTML+=`<div class="empty">Keine Abfahrten</div>`;
     else for(const d of deps){
       const m=minuten(d);
-      const zeit = m<=0 ? `<span class="num">jetzt</span>`
-                        : `<span class="num">${m}</span><span class="unit">min</span>`;
-      const delay=(d.delayInMinutes>0)?`<span class="delay">+${d.delayInMinutes}</span>`:"";
       el.innerHTML+=`<div class="row">
-          <span class="badge" style="background:${farbe(d.label)}">${d.label||"?"}</span>
-          <span class="dest">${d.destination||""}</span>
-          <span class="time ${m<=2?'soon':''}">${zeit}${delay}</span></div>`;
+        <span class="badge" style="background:${farbe(d.label)}">${d.label||"?"}</span>
+        <span class="dest">${d.destination||""}</span>
+        ${zeitHtml(m, d.delayInMinutes||0)}
+      </div>`;
     }
-  }catch(e){ el.innerHTML+=`<div class="err">⚠️ ${e.message||"Fehler beim Laden"}</div>`; }
+  }catch(e){ el.innerHTML+=`<div class="err">⚠️ ${e.message}</div>`; }
   return el;
 }
 
