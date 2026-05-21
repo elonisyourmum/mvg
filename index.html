@@ -10,6 +10,7 @@
     --ink:#f3f5f7; --muted:#828c98; --mvv:#00a13a;
     --amber:#ffc15e; --soon:#ff6b5a;
     --sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Arial,sans-serif;
+    --mono:"SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{
@@ -36,17 +37,32 @@
           margin-bottom:.5vmin;color:var(--ink);}
 
   .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.7rem;
-       padding:.5vmin 0;}
+       padding:.55vmin 0;}
   .row + .row{border-top:1px solid var(--line);}
   .badge{color:#fff;border-radius:6px;font-weight:700;
          padding:.14em .46em;min-width:2.3em;text-align:center;
          font-size:clamp(.75rem,2.4vmin,1rem);}
   .dest{font-size:clamp(.82rem,2.6vmin,1.08rem);font-weight:400;color:#dfe3e8;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .min{font-size:clamp(.82rem,2.6vmin,1.08rem);color:var(--amber);text-align:right;
-       white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums;}
+
+  /* Split-Flap / Zifferntafel-Look für die Zeit */
+  .min{display:inline-flex;align-items:center;gap:.28em;justify-content:flex-end;
+       color:var(--amber);white-space:nowrap;}
   .min.soon{color:var(--soon);}
-  .delay{color:var(--soon);font-size:.72em;}
+  .flap{display:inline-flex;gap:2px;}
+  .flap b{
+    position:relative;display:inline-block;min-width:1.05em;text-align:center;
+    font-family:var(--mono);font-weight:700;color:currentColor;
+    font-size:clamp(.82rem,2.6vmin,1.06rem);line-height:1.25;
+    padding:.12em .12em;border-radius:4px;
+    background:linear-gradient(#2b313d 0 50%, #1e242d 50% 100%);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.05), 0 1px 1px rgba(0,0,0,.4);
+  }
+  .flap b::after{content:"";position:absolute;left:6%;right:6%;top:50%;height:1px;
+                 background:rgba(0,0,0,.6);transform:translateY(-.5px);}
+  .unit{font-size:.72em;color:var(--muted);font-weight:600;letter-spacing:.02em;}
+  .delay{color:var(--soon);font-size:.7em;font-weight:700;}
+
   .empty,.err{color:var(--muted);font-size:clamp(.78rem,2.3vmin,.95rem);padding:.4vmin 0;}
   .err{color:var(--soon);}
   .updated{text-align:right;color:var(--muted);font-size:.72rem;margin-top:1vmin;
@@ -90,7 +106,6 @@ async function holen(url){
   throw lastErr || new Error("Kein Zugriff");
 }
 
-/* Münchner Linienfarben (S5 dunkelblau) */
 const LINIEN = {
   U1:"#438136", U2:"#C20831", U3:"#EC6726", U4:"#00A984", U5:"#BC7A00", U6:"#0065B1", U7:"#C20831", U8:"#EC6726",
   S1:"#16BAE7", S2:"#76B82A", S3:"#9B268F", S4:"#E30613", S5:"#1c3f94", S6:"#00975F", S7:"#943126", S8:"#5A5A5A", S20:"#ED6B22"
@@ -102,6 +117,9 @@ function farbe(label){
   if(l.startsWith("U")) return "#0065B1";
   return "#d11e2a";
 }
+
+/* erzeugt die Kachel-Ziffern */
+function flap(str){ return `<span class="flap">`+[...str].map(c=>`<b>${c}</b>`).join("")+`</span>`; }
 
 async function abfahrten(id){ return await holen(`${API}/departures?globalId=${id}&limit=20`); }
 
@@ -132,12 +150,13 @@ async function renderWeg(weg){
     deps=deps.slice(0,PRO_WEG);
     if(deps.length===0){ el.innerHTML+=`<div class="empty">Keine passenden Abfahrten</div>`; }
     else for(const d of deps){
-      const m=minuten(d), txt=m<=0?"jetzt":m+" min";
-      const delay=(d.delayInMinutes>0)?`<span class="delay"> +${d.delayInMinutes}</span>`:"";
+      const m=minuten(d);
+      const zeit = m<=0 ? flap("JETZT") : flap(String(m))+`<span class="unit">min</span>`;
+      const delay=(d.delayInMinutes>0)?`<span class="delay">+${d.delayInMinutes}</span>`:"";
       el.innerHTML+=`<div class="row">
           <span class="badge" style="background:${farbe(d.label)}">${d.label||"?"}</span>
           <span class="dest">${d.destination||""}</span>
-          <span class="min ${m<=2?'soon':''}">${txt}${delay}</span></div>`;
+          <span class="min ${m<=2?'soon':''}">${zeit}${delay}</span></div>`;
     }
   }catch(e){ el.innerHTML+=`<div class="err">⚠️ ${e.message||"Fehler beim Laden"}</div>`; }
   return el;
