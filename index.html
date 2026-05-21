@@ -106,7 +106,7 @@ async function holen(url){
 
 async function fetchStation(weg){
   try{
-    const deps = await holen(`${API}/departures?globalId=${weg.id}&limit=20`);
+    const deps = await holen(`${API}/departures?globalId=${weg.id}&limit=40`);
     depCache[weg.id] = deps;
     errCache[weg.id] = null;
     clearTimeout(retryTmr[weg.id]);
@@ -157,7 +157,7 @@ function renderWeg(weg){
   const el=document.createElement("div");el.className="card";
   el.innerHTML=`<div class="station">
     <span class="sname">${weg.person}</span>
-    <span class="thresh">&gt;${weg.threshold} min</span>
+    <span class="thresh">~${weg.threshold+1} min</span>
   </div>`;
 
   const raw = depCache[weg.id];
