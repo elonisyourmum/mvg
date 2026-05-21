@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MVV Abfahrten</title>
+<style>
+  /* Signage-/DIN-artige Schrift statt Standard-Sans */
+  @import url('https://fonts.googleapis.com/css2?family=Fjalla+One&family=Barlow+Semi+Condensed:wght@500;600&family=DM+Mono:wght@500&display=swap');
+
+  :root{
+    --bg:#0a0c0f;
+    --panel:#13171d;
+    --line:#222a33;
+    --ink:#f2f5f8;
+    --muted:#7c8896;
+    --mvv:#00a13a;          /* MVV-Grün */
+    --amber:#ffb000;
+    --soon:#ff5a4d;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:'Barlow Semi Condensed',sans-serif;
+    background:var(--bg);color:var(--ink);
+    padding:3vmin 4vmin;overflow:hidden;user-select:none;
+  }
+  .topbar{
+    display:flex;align-items:center;gap:1.6vmin;
+    border-bottom:2px solid var(--mvv);
+    padding-bottom:1.4vmin;margin-bottom:2vmin;
+  }
+  /* MVV-Logo (stilisierter Platzhalter, nicht das offizielle Markenlogo) */
+  .logo{
+    font-family:'Fjalla One',sans-serif;
+    background:var(--mvv);color:#fff;
+    font-size:clamp(1.3rem,5vmin,2.3rem);
+    line-height:1;letter-spacing:.06em;
+    padding:.32em .5em .26em;border-radius:9px;
+    box-shadow:0 2px 0 rgba(0,0,0,.4) inset;
+  }
+  .topbar h1{
+    font-family:'Fjalla One',sans-serif;
+    font-size:clamp(1.3rem,4.6vmin,2.2rem);
+    letter-spacing:.05em;text-transform:uppercase;font-weight:400;
+  }
+  .topbar .clock{
+    margin-left:auto;font-family:'DM Mono',monospace;color:var(--amber);
+    font-size:clamp(1.3rem,4.6vmin,2.2rem);
+  }
+
+  .board{display:flex;flex-direction:column;gap:1.8vmin;}
+  .weg{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1.6vmin 2vmin;}
+  .weg-head{display:flex;align-items:baseline;gap:.8rem;margin-bottom:1vmin;}
+  .person{font-family:'Fjalla One',sans-serif;font-size:clamp(1.2rem,4.4vmin,2rem);letter-spacing:.02em;}
+  .ort{color:var(--muted);font-size:clamp(.8rem,2.8vmin,1rem);text-transform:uppercase;letter-spacing:.06em;}
+
+  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1rem;
+       padding:.85vmin 0;border-top:1px solid var(--line);}
+  .row:first-of-type{border-top:none;}
+  .badge{font-family:'Fjalla One',sans-serif;color:#000;border-radius:7px;
+         padding:.18em .55em;min-width:2.6em;text-align:center;font-size:clamp(1rem,3.6vmin,1.5rem);}
+  .dest{font-size:clamp(1.05rem,3.7vmin,1.55rem);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .min{font-family:'DM Mono',monospace;font-size:clamp(1rem,3.8vmin,1.6rem);color:var(--amber);text-align:right;white-space:nowrap;}
+  .min.soon{color:var(--soon);}
+  .delay{color:var(--soon);font-size:.7em;}
+  .empty,.err{color:var(--muted);font-size:clamp(.9rem,3vmin,1.1rem);padding:.6vmin 0;}
+  .err{color:var(--soon);}
+  .updated{position:fixed;bottom:1.2vmin;right:2vmin;color:var(--muted);font-size:.8rem;font-family:'DM Mono',monospace;}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="logo">MVV</span>
+    <h1>Abfahrten</h1>
+    <span class="clock" id="clock">--:--</span>
+  </div>
+  <div class="board" id="board"></div>
+  <div class="updated" id="updated"></div>
+
+<script>
+/* ============================================================
+   EINGESPEICHERTE WEGE
+   - person:     Überschrift (Haltestellenname)
+   - station:    Haltestelle exakt wie in der MVV-App
+   - filterLine: "" = alle | "U2" | "S" (alle S-Bahnen) | "Tram 15"
+   - filterZiel: "" = alle Richtungen | Teil des Zielnamens
+   ============================================================ */
+const WEGE = [
+  { person: "Silberhornstraße",  id: "de:09162:1170", filterLine: "", filterZiel: "" },
+  { person: "Ostfriedhof",       id: "de:09162:1105", filterLine: "", filterZiel: "" },
+  { person: "St.-Martin-Straße", id: "de:09162:1100", filterLine: "", filterZiel: "" },
+  { person: "Kolumbusplatz",     id: "de:09162:160",  filterLine: "", filterZiel: "" },
+];
+
+const PRIO_UBAHN = true;   // U-Bahnen zuerst anzeigen
+const PRO_WEG    = 4;      // Abfahrten pro Haltestelle
+const INTERVALL  = 30000;  // Aktualisierung in ms (30 s)
+
+
+/* Mehrere CORS-Proxys als Fallback. In Fully Kiosk mit deaktivierter
+   Web-Sicherheit kannst du "" (direkt) an den Anfang setzen. */
+/* Direkter Zugriff auf MVG.
+   Benötigt: Fully Kiosk → Advanced Web Settings → "Disable Web Security (CORS)" = AN */
+const API = "https://www.mvg.de/api/bgw-pt/v3";
+const PROXIES = [""];
+async function holen(url){
+  let lastErr;
+  for(const p of PROXIES){
+    try{
+      const ziel = p ? p + encodeURIComponent(url) : url;
+      const r = await fetch(ziel);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      return await r.json();
+    }catch(e){ lastErr=e; }
+  }
+  throw lastErr || new Error("Kein Proxy erreichbar");
+}
+
+function farbe(label){
+  const l=(label||"").toUpperCase();
+  const map={U1:"#447b30",U2:"#c4022f",U3:"#ec6608",U4:"#00a984",U5:"#bc7a00",U6:"#0065ae",U7:"#c4022f",U8:"#ec6608"};
+  if(map[l]) return map[l];
+  if(l.startsWith("S")) return "#00903a";
+  if(l.startsWith("U")) return "#0065ae";
+  if(l.startsWith("N")) return "#222a33";
+  return "#d11e2a";
+}
+
+async function abfahrten(id){ return await holen(`${API}/departures?globalId=${id}&limit=12`); }
+
+function matcht(dep,weg){
+  const label=(dep.label||"").toUpperCase();
+  const ziel =(dep.destination||"").toLowerCase();
+  if(weg.filterLine){
+    const f=weg.filterLine.toUpperCase().replace("TRAM ","").replace("BUS ","").trim();
+    if(!label.startsWith(f)) return false;
+  }
+  if(weg.filterZiel && !ziel.includes(weg.filterZiel.toLowerCase())) return false;
+  return true;
+}
+function minuten(dep){
+  const t=dep.realtimeDepartureTime || dep.plannedDepartureTime;
+  return Math.round((t-Date.now())/60000);
+}
+
+async function renderWeg(weg){
+  const el=document.createElement("div");el.className="weg";
+  el.innerHTML=`<div class="weg-head"><span class="person">${weg.person}</span></div>`;
+  try{
+    const id=weg.id;
+    let deps=(await abfahrten(id)).filter(d=>!d.cancelled && matcht(d,weg) && minuten(d)>=0);
+    deps.sort((a,b)=>{
+      if(PRIO_UBAHN){
+        const ua=(a.transportType==="UBAHN")?0:1, ub=(b.transportType==="UBAHN")?0:1;
+        if(ua!==ub) return ua-ub;
+      }
+      return minuten(a)-minuten(b);
+    });
+    deps=deps.slice(0,PRO_WEG);
+    if(deps.length===0){ el.innerHTML+=`<div class="empty">Keine passenden Abfahrten</div>`; }
+    else for(const d of deps){
+      const m=minuten(d), txt=m<=0?"jetzt":m+" min";
+      const delay=(d.delayInMinutes>0)?`<span class="delay"> +${d.delayInMinutes}</span>`:"";
+      el.innerHTML+=`<div class="row">
+          <span class="badge" style="background:${farbe(d.label)}">${d.label||"?"}</span>
+          <span class="dest">${d.destination||""}</span>
+          <span class="min ${m<=2?'soon':''}">${txt}${delay}</span></div>`;
+    }
+  }catch(e){ el.innerHTML+=`<div class="err">⚠️ ${e.message||"Fehler beim Laden"}</div>`; }
+  return el;
+}
+
+async function update(){
+  const board=document.getElementById("board");
+  const teile=await Promise.all(WEGE.map(renderWeg));
+  board.replaceChildren(...teile);
+  document.getElementById("updated").textContent=
+    "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}
+function clock(){
+  document.getElementById("clock").textContent=
+    new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+}
+clock(); setInterval(clock,10000);
+update(); setInterval(update,INTERVALL);
+</script>
+</body>
+</html>
