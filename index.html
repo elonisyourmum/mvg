@@ -9,9 +9,7 @@
     --bg:#0e1116; --card:#171b22; --line:#242a33;
     --ink:#f4f6f8; --muted:#8b95a1;
     --mgv:#0065B1;
-    --gruen:#5ba368;
-    --gelb:#c49a2e;
-    --rot:#e85d4a;
+    --gruen:#5ba368; --gelb:#c49a2e; --rot:#e85d4a;
     --sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI","Helvetica Neue",Arial,sans-serif;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -19,6 +17,7 @@
     font-family:var(--sys);background:var(--bg);color:var(--ink);
     padding:1.9vmin 2.5vmin 2.1vmin;overflow-y:auto;min-height:100vh;user-select:none;
     -webkit-font-smoothing:antialiased;
+    transition:filter .8s ease;   /* sanftes Ein-/Ausblenden des Nacht-Modus */
   }
   .topbar{
     display:flex;align-items:center;gap:1.1vmin;
@@ -28,7 +27,7 @@
   }
   .logo{background:var(--mgv);color:#fff;font-weight:700;
         font-size:clamp(.82rem,2.8vmin,1.08rem);letter-spacing:.02em;
-        padding:.28em .46em;border-radius:7px;line-height:1;}
+        padding:.3em .48em;border-radius:7px;line-height:1;}
   .topbar h1{font-size:clamp(.86rem,2.8vmin,1.1rem);font-weight:600;}
   .topbar .clock{margin-left:auto;color:var(--muted);font-size:clamp(.86rem,2.8vmin,1.06rem);
                  font-weight:500;font-variant-numeric:tabular-nums;}
@@ -36,14 +35,16 @@
   .board{display:flex;flex-direction:column;gap:1.1vmin;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:13px;
         padding:1.1vmin 1.5vmin .55vmin;}
-  .station{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);margin-bottom:.55vmin;}
+  .station{display:flex;align-items:baseline;gap:.4em;margin-bottom:.55vmin;}
+  .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);}
+  /* Schwellenwert-Hinweis neben dem Stationsnamen */
+  .thresh{font-size:.65em;color:var(--muted);font-weight:400;letter-spacing:.01em;}
 
   .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.65rem;
        padding:.46vmin 0;}
   .row + .row{border-top:1px solid var(--line);}
-
   .badge{color:#fff;border-radius:6px;font-weight:700;
-         padding:.12em .42em;min-width:2.2em;text-align:center;
+         padding:.13em .44em;min-width:2.3em;text-align:center;
          font-size:clamp(.75rem,2.4vmin,.98rem);}
   .dest{font-size:clamp(.84rem,2.7vmin,1.07rem);font-weight:400;color:#d6dbe1;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -55,8 +56,10 @@
         font-variant-numeric:tabular-nums;line-height:1;}
   .tunit{font-size:.67em;color:var(--muted);font-weight:500;}
 
-  .empty,.err{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
-  .err{color:var(--rot);}
+  .empty{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
+  .err{color:var(--rot);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
+  .loading{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;
+           opacity:.5;}
   .updated{text-align:center;color:var(--muted);font-size:.74rem;margin-top:.9vmin;opacity:.6;}
 </style>
 </head>
@@ -77,11 +80,19 @@ const WEGE = [
   { person:"Kolumbusplatz",     id:"de:09162:160",  threshold:11, filterLine:"", filterZiel:"" },
 ];
 
-const PRIO_UBAHN = true;
-const PRO_WEG    = 5;
-const INTERVALL  = 30000;
+const PRIO_UBAHN  = true;
+const PRO_WEG     = 6;
+const FETCH_INT   = 30000;   // API-Abfrage alle 30 s
+const RENDER_INT  = 20000;   // Anzeige-Update alle 20 s (kein Netzwerk)
+const RETRY_AFTER = 10000;   // Retry nach Fehler nach 10 s
+const NIGHT_DIM   = 0.35;    // Helligkeit 23–6 Uhr
 const API = "https://www.mvg.de/api/bgw-pt/v3";
 const PROXIES = [""];
+
+/* Cache: rohe API-Daten pro Station-ID */
+const depCache  = {};   // id → Array von Abfahrten
+const errCache  = {};   // id → Fehlermeldung
+const retryTmr  = {};   // id → setTimeout-Handle
 
 async function holen(url){
   let lastErr;
@@ -96,6 +107,23 @@ async function holen(url){
   throw lastErr||new Error("Kein Zugriff");
 }
 
+async function fetchStation(weg){
+  try{
+    const deps = await holen(`${API}/departures?globalId=${weg.id}&limit=20`);
+    depCache[weg.id] = deps;
+    errCache[weg.id] = null;
+    clearTimeout(retryTmr[weg.id]);
+  }catch(e){
+    errCache[weg.id] = e.message||"Fehler";
+    /* Auto-Retry nach 10 s */
+    clearTimeout(retryTmr[weg.id]);
+    retryTmr[weg.id] = setTimeout(()=>fetchStation(weg), RETRY_AFTER);
+  }
+}
+
+async function fetchAll(){ await Promise.all(WEGE.map(fetchStation)); }
+
+/* Linienfarben */
 const LINIEN = {
   U1:"#438136",U2:"#C20831",U3:"#EC6726",U4:"#00A984",U5:"#BC7A00",U6:"#0065B1",U7:"#C20831",U8:"#EC6726",
   S1:"#16BAE7",S2:"#76B82A",S3:"#9B268F",S4:"#E30613",S5:"#1c3f94",S6:"#00975F",S7:"#943126",S8:"#5A5A5A",S20:"#ED6B22"
@@ -114,13 +142,7 @@ function statusFarbe(m, threshold){
   return "var(--gruen)";
 }
 
-function zeitHtml(m, threshold){
-  const col = statusFarbe(m, threshold);
-  if(m<=0) return `<span class="tcell"><span class="tnum" style="color:var(--rot)">jetzt</span><span class="tbar" style="background:${col}"></span></span>`;
-  return `<span class="tcell"><span class="tnum">${m}</span><span class="tunit">min</span><span class="tbar" style="background:${col}"></span></span>`;
-}
-
-async function abfahrten(id){ return await holen(`${API}/departures?globalId=${id}&limit=20`); }
+function minuten(dep){ return Math.round(((dep.realtimeDepartureTime||dep.plannedDepartureTime)-Date.now())/60000); }
 
 function matcht(dep,weg){
   const label=(dep.label||"").toUpperCase();
@@ -132,43 +154,79 @@ function matcht(dep,weg){
   if(weg.filterZiel&&!ziel.includes(weg.filterZiel.toLowerCase())) return false;
   return true;
 }
-function minuten(dep){ return Math.round(((dep.realtimeDepartureTime||dep.plannedDepartureTime)-Date.now())/60000); }
 
-async function renderWeg(weg){
+/* Render – synchron aus Cache (kein Netzwerk) */
+function renderWeg(weg){
   const el=document.createElement("div");el.className="card";
-  el.innerHTML=`<div class="station">${weg.person}</div>`;
-  try{
-    let deps=(await abfahrten(weg.id)).filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=0);
-    deps.sort((a,b)=>{
-      if(PRIO_UBAHN){
-        const ua=(a.transportType==="UBAHN")?0:1,ub=(b.transportType==="UBAHN")?0:1;
-        if(ua!==ub) return ua-ub;
-      }
-      return minuten(a)-minuten(b);
-    });
-    deps=deps.slice(0,PRO_WEG);
-    if(deps.length===0) el.innerHTML+=`<div class="empty">Keine Abfahrten</div>`;
-    else for(const d of deps){
-      const m=minuten(d);
-      el.innerHTML+=`<div class="row">
-        <span class="badge" style="background:${farbe(d.label)}">${d.label||"?"}</span>
-        <span class="dest">${d.destination||""}</span>
-        ${zeitHtml(m,weg.threshold)}
-      </div>`;
+  el.innerHTML=`<div class="station">
+    <span class="sname">${weg.person}</span>
+    <span class="thresh">≥${weg.threshold} min</span>
+  </div>`;
+
+  const raw = depCache[weg.id];
+  if(!raw){
+    const msg = errCache[weg.id]
+      ? `<div class="err">⚠️ ${errCache[weg.id]} – Retry läuft…</div>`
+      : `<div class="loading">Lade…</div>`;
+    el.innerHTML += msg;
+    return el;
+  }
+
+  let deps = raw.filter(d=>!d.cancelled && matcht(d,weg) && minuten(d)>=0);
+  deps.sort((a,b)=>{
+    if(PRIO_UBAHN){
+      const ua=(a.transportType==="UBAHN")?0:1,ub=(b.transportType==="UBAHN")?0:1;
+      if(ua!==ub) return ua-ub;
     }
-  }catch(e){ el.innerHTML+=`<div class="err">⚠️ ${e.message}</div>`; }
+    return minuten(a)-minuten(b);
+  });
+  deps=deps.slice(0,PRO_WEG);
+
+  if(deps.length===0){ el.innerHTML+=`<div class="empty">Keine Abfahrten</div>`; return el; }
+
+  for(const d of deps){
+    const m=minuten(d);
+    const col=statusFarbe(m,weg.threshold);
+    const zeit = m<=0
+      ? `<span class="tcell"><span class="tnum" style="color:var(--rot)">jetzt</span><span class="tbar" style="background:${col}"></span></span>`
+      : `<span class="tcell"><span class="tnum">${m}</span><span class="tunit">min</span><span class="tbar" style="background:${col}"></span></span>`;
+    el.innerHTML+=`<div class="row">
+      <span class="badge" style="background:${farbe(d.label)}">${d.label||"?"}</span>
+      <span class="dest">${d.destination||""}</span>
+      ${zeit}
+    </div>`;
+  }
   return el;
 }
 
-async function update(){
-  const teile=await Promise.all(WEGE.map(renderWeg));
+function renderAll(){
+  const teile=WEGE.map(renderWeg);
   document.getElementById("board").replaceChildren(...teile);
   document.getElementById("updated").textContent=
     "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
 }
+
+/* Uhr */
 function clock(){ document.getElementById("clock").textContent=new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}); }
+
+/* Nacht-Abdunkelung 23–6 Uhr */
+function nightMode(){
+  const h=new Date().getHours();
+  document.body.style.filter=(h>=23||h<6)?`brightness(${NIGHT_DIM})`:"";
+}
+
+/* Start */
 clock(); setInterval(clock,10000);
-update(); setInterval(update,INTERVALL);
+nightMode(); setInterval(nightMode,60000);
+
+/* Erst Daten holen, dann anzeigen */
+fetchAll().then(renderAll);
+
+/* Countdown: Anzeige alle 20 s aus Cache neu berechnen */
+setInterval(renderAll, RENDER_INT);
+
+/* API-Refresh alle 30 s */
+setInterval(()=>fetchAll().then(renderAll), FETCH_INT);
 </script>
 </body>
 </html>
