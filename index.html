@@ -121,12 +121,12 @@ function zeitHtml(m, delay, threshold){
   const numTxt = m<=0 ? "jetzt" : String(m);
   const unitTxt = m<=0 ? "" : "min";
   return `<span class="tcell">
-    <span class="tbar" style="background:${col}"></span>
     <span class="tnum">${numTxt}</span>
     <span class="tright">
       <span class="tdel" style="opacity:${delay>0?1:0}">${delay>0?'+'+delay:'+'}</span>
       <span class="tunit">${unitTxt}</span>
     </span>
+    <span class="tbar" style="background:${col}"></span>
   </span>`;
 }
 
