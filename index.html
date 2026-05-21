@@ -49,17 +49,15 @@
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
   /* Zeitspalte */
-  .tcell{display:flex;align-items:center;justify-content:flex-end;gap:.26em;min-width:4.8em;}
-  .tbar{width:3px;height:.9em;border-radius:2px;flex-shrink:0;}   /* farbiger Statusbalken */
+  .tcell{display:flex;align-items:baseline;justify-content:flex-end;gap:.22em;min-width:4.4em;}
+  .tbar{width:3px;height:.85em;border-radius:2px;align-self:center;flex-shrink:0;}
   .tnum{font-size:clamp(.88rem,2.7vmin,1.12rem);font-weight:700;color:var(--ink);
         font-variant-numeric:tabular-nums;line-height:1;}
-  .tright{display:flex;flex-direction:column;align-items:flex-start;}
-  .tdel{font-size:.6em;color:var(--rot);font-weight:700;line-height:1.1;}
-  .tunit{font-size:.67em;color:var(--muted);font-weight:500;line-height:1.3;}
+  .tunit{font-size:.67em;color:var(--muted);font-weight:500;}
 
   .empty,.err{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
   .err{color:var(--rot);}
-  .updated{text-align:right;color:var(--muted);font-size:.68rem;margin-top:.7vmin;opacity:.6;}
+  .updated{text-align:center;color:var(--muted);font-size:.68rem;margin-top:.7vmin;opacity:.6;}
 </style>
 </head>
 <body>
@@ -116,18 +114,10 @@ function statusFarbe(m, threshold){
   return "var(--gruen)";
 }
 
-function zeitHtml(m, delay, threshold){
+function zeitHtml(m, threshold){
   const col = statusFarbe(m, threshold);
-  const numTxt = m<=0 ? "jetzt" : String(m);
-  const unitTxt = m<=0 ? "" : "min";
-  return `<span class="tcell">
-    <span class="tnum">${numTxt}</span>
-    <span class="tright">
-      <span class="tdel" style="opacity:${delay>0?1:0}">${delay>0?'+'+delay:'+'}</span>
-      <span class="tunit">${unitTxt}</span>
-    </span>
-    <span class="tbar" style="background:${col}"></span>
-  </span>`;
+  if(m<=0) return `<span class="tcell"><span class="tnum" style="color:var(--rot)">jetzt</span><span class="tbar" style="background:${col}"></span></span>`;
+  return `<span class="tcell"><span class="tnum">${m}</span><span class="tunit">min</span><span class="tbar" style="background:${col}"></span></span>`;
 }
 
 async function abfahrten(id){ return await holen(`${API}/departures?globalId=${id}&limit=20`); }
@@ -163,7 +153,7 @@ async function renderWeg(weg){
       el.innerHTML+=`<div class="row">
         <span class="badge" style="background:${farbe(d.label)}">${d.label||"?"}</span>
         <span class="dest">${d.destination||""}</span>
-        ${zeitHtml(m,d.delayInMinutes||0,weg.threshold)}
+        ${zeitHtml(m,weg.threshold)}
       </div>`;
     }
   }catch(e){ el.innerHTML+=`<div class="err">⚠️ ${e.message}</div>`; }
