@@ -73,14 +73,13 @@
 
 <script>
 const WEGE = [
-  { person:"Silberhornstraße",  id:"de:09162:1170", threshold:9,  filterLine:"", filterZiel:"" },
+  { person:"Silberhornstraße",  id:"de:09162:1170", threshold:9,  filterLine:"U", filterZiel:"" },
   { person:"Ostfriedhof",       id:"de:09162:1105", threshold:3,  filterLine:"", filterZiel:"" },
   { person:"St.-Martin-Straße", id:"de:09162:1100", threshold:14, filterLine:"", filterZiel:"" },
-  { person:"Kolumbusplatz",     id:"de:09162:160",  threshold:11, filterLine:"", filterZiel:"" },
+  { person:"Kolumbusplatz",     id:"de:09162:160",  threshold:11, filterLine:"U", filterZiel:"" },
 ];
 
-const PRIO_UBAHN  = true;
-const PRO_WEG     = 6;
+const PRO_WEG     = 4;
 const FETCH_INT   = 30000;   // API-Abfrage alle 30 s
 const RENDER_INT  = 10000;   // Anzeige-Update alle 10 s (kein Netzwerk)
 const RETRY_AFTER = 10000;   // Retry nach Fehler nach 10 s
@@ -158,7 +157,7 @@ function renderWeg(weg){
   const el=document.createElement("div");el.className="card";
   el.innerHTML=`<div class="station">
     <span class="sname">${weg.person}</span>
-    <span class="thresh">≥${weg.threshold} min</span>
+    <span class="thresh">&gt;${weg.threshold} min</span>
   </div>`;
 
   const raw = depCache[weg.id];
@@ -171,13 +170,7 @@ function renderWeg(weg){
   }
 
   let deps = raw.filter(d=>!d.cancelled && matcht(d,weg) && minuten(d)>=0);
-  deps.sort((a,b)=>{
-    if(PRIO_UBAHN){
-      const ua=(a.transportType==="UBAHN")?0:1,ub=(b.transportType==="UBAHN")?0:1;
-      if(ua!==ub) return ua-ub;
-    }
-    return minuten(a)-minuten(b);
-  });
+  deps.sort((a,b)=>minuten(a)-minuten(b));
   deps=deps.slice(0,PRO_WEG);
 
   if(deps.length===0){ el.innerHTML+=`<div class="empty">Keine Abfahrten</div>`; return el; }
