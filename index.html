@@ -8,58 +8,58 @@
   :root{
     --bg:#0e1116; --card:#171b22; --line:#242a33;
     --ink:#f4f6f8; --muted:#8b95a1;
-    --mgv:#0065B1;            /* MVG Blau */
-    --gruen:#5ba368;          /* erreichbar – dezentes Grün */
-    --gelb:#c49a2e;           /* knapp – dezentes Gold */
-    --rot:#e85d4a;            /* zu spät – Rot */
+    --mgv:#0065B1;
+    --gruen:#5ba368;
+    --gelb:#c49a2e;
+    --rot:#e85d4a;
     --sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI","Helvetica Neue",Arial,sans-serif;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{
     font-family:var(--sys);background:var(--bg);color:var(--ink);
-    padding:1.8vmin 2.4vmin 2vmin;overflow-y:auto;min-height:100vh;user-select:none;
+    padding:1.6vmin 2.2vmin 1.8vmin;overflow-y:auto;min-height:100vh;user-select:none;
     -webkit-font-smoothing:antialiased;
   }
   .topbar{
-    display:flex;align-items:center;gap:1.2vmin;
-    padding-bottom:1.1vmin;margin-bottom:1.4vmin;
+    display:flex;align-items:center;gap:1.1vmin;
+    padding-bottom:1vmin;margin-bottom:1.2vmin;
     border-bottom:1px solid var(--line);
     position:sticky;top:0;background:var(--bg);z-index:5;
   }
   .logo{background:var(--mgv);color:#fff;font-weight:700;
-        font-size:clamp(.78rem,2.6vmin,1.05rem);letter-spacing:.02em;
-        padding:.3em .48em;border-radius:7px;line-height:1;}
-  .topbar h1{font-size:clamp(.82rem,2.6vmin,1.08rem);font-weight:600;}
-  .topbar .clock{margin-left:auto;color:var(--muted);font-size:clamp(.82rem,2.6vmin,1.05rem);
+        font-size:clamp(.76rem,2.5vmin,1rem);letter-spacing:.02em;
+        padding:.28em .46em;border-radius:7px;line-height:1;}
+  .topbar h1{font-size:clamp(.8rem,2.5vmin,1.05rem);font-weight:600;}
+  .topbar .clock{margin-left:auto;color:var(--muted);font-size:clamp(.8rem,2.5vmin,1.02rem);
                  font-weight:500;font-variant-numeric:tabular-nums;}
 
-  .board{display:flex;flex-direction:column;gap:1vmin;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
-        padding:1vmin 1.4vmin .5vmin;}
-  .station{font-weight:600;font-size:clamp(.88rem,2.7vmin,1.12rem);margin-bottom:.5vmin;}
+  .board{display:flex;flex-direction:column;gap:.9vmin;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;
+        padding:.9vmin 1.3vmin .45vmin;}
+  .station{font-weight:600;font-size:clamp(.86rem,2.6vmin,1.08rem);margin-bottom:.45vmin;}
 
-  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.7rem;
-       padding:.46vmin 0;}
+  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.65rem;
+       padding:.38vmin 0;}
   .row + .row{border-top:1px solid var(--line);}
 
   .badge{color:#fff;border-radius:6px;font-weight:700;
-         padding:.13em .44em;min-width:2.3em;text-align:center;
-         font-size:clamp(.72rem,2.2vmin,.94rem);}
-  .dest{font-size:clamp(.8rem,2.5vmin,1.04rem);font-weight:400;color:#d6dbe1;
+         padding:.12em .42em;min-width:2.2em;text-align:center;
+         font-size:clamp(.7rem,2.15vmin,.92rem);}
+  .dest{font-size:clamp(.78rem,2.4vmin,1.01rem);font-weight:400;color:#d6dbe1;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-  /* Zeitspalte – immer gleiche Höhe durch feste Struktur */
-  .tcell{display:flex;align-items:flex-end;justify-content:flex-end;gap:.2em;
-         min-width:4.4em;}
-  .tnum{font-size:clamp(.9rem,2.8vmin,1.15rem);font-weight:700;
+  /* Zeitspalte */
+  .tcell{display:flex;align-items:center;justify-content:flex-end;gap:.26em;min-width:4.8em;}
+  .tbar{width:3px;height:.9em;border-radius:2px;flex-shrink:0;}   /* farbiger Statusbalken */
+  .tnum{font-size:clamp(.88rem,2.7vmin,1.12rem);font-weight:700;color:var(--ink);
         font-variant-numeric:tabular-nums;line-height:1;}
   .tright{display:flex;flex-direction:column;align-items:flex-start;}
-  .tdel{font-size:.6em;color:var(--rot);font-weight:700;line-height:1.15;}  /* immer gerendert */
-  .tunit{font-size:.68em;color:var(--muted);font-weight:500;line-height:1.3;}
+  .tdel{font-size:.6em;color:var(--rot);font-weight:700;line-height:1.1;}
+  .tunit{font-size:.67em;color:var(--muted);font-weight:500;line-height:1.3;}
 
-  .empty,.err{color:var(--muted);font-size:clamp(.76rem,2.2vmin,.92rem);padding:.4vmin 0;}
+  .empty,.err{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
   .err{color:var(--rot);}
-  .updated{text-align:right;color:var(--muted);font-size:.7rem;margin-top:.8vmin;opacity:.6;}
+  .updated{text-align:right;color:var(--muted);font-size:.68rem;margin-top:.7vmin;opacity:.6;}
 </style>
 </head>
 <body>
@@ -72,8 +72,6 @@
   <div class="updated" id="updated"></div>
 
 <script>
-/* threshold = Minuten ab denen du die Bahn noch schaffst (→ grün).
-   Darunter = gelb, ≤1 min = rot. Anpassen wenn sich dein Fußweg ändert. */
 const WEGE = [
   { person:"Silberhornstraße",  id:"de:09162:1170", threshold:9,  filterLine:"", filterZiel:"" },
   { person:"Ostfriedhof",       id:"de:09162:1105", threshold:3,  filterLine:"", filterZiel:"" },
@@ -82,9 +80,8 @@ const WEGE = [
 ];
 
 const PRIO_UBAHN = true;
-const PRO_WEG    = 5;
+const PRO_WEG    = 4;
 const INTERVALL  = 30000;
-
 const API = "https://www.mvg.de/api/bgw-pt/v3";
 const PROXIES = [""];
 
@@ -92,13 +89,13 @@ async function holen(url){
   let lastErr;
   for(const p of PROXIES){
     try{
-      const ziel = p ? p + encodeURIComponent(url) : url;
+      const ziel = p ? p+encodeURIComponent(url) : url;
       const r = await fetch(ziel);
       if(!r.ok) throw new Error("HTTP "+r.status);
       return await r.json();
     }catch(e){ lastErr=e; }
   }
-  throw lastErr || new Error("Kein Zugriff");
+  throw lastErr||new Error("Kein Zugriff");
 }
 
 const LINIEN = {
@@ -113,30 +110,22 @@ function farbe(label){
   return "#d11e2a";
 }
 
-function zeitfarbe(m, threshold){
+function statusFarbe(m, threshold){
   if(m<=1)         return "var(--rot)";
   if(m<=threshold) return "var(--gelb)";
   return "var(--gruen)";
 }
 
-/* Zeitzelle: immer gleiche Höhe – Verspätungszeile immer gerendert,
-   nur Sichtbarkeit per opacity gesteuert */
 function zeitHtml(m, delay, threshold){
-  if(m<=0){
-    return `<span class="tcell">
-      <span class="tnum" style="color:var(--rot)">jetzt</span>
-      <span class="tright">
-        <span class="tdel" style="opacity:${delay>0?1:0}">${delay>0?'+'+delay:'·'}</span>
-        <span class="tunit" style="opacity:0">min</span>
-      </span>
-    </span>`;
-  }
-  const col = zeitfarbe(m, threshold);
+  const col = statusFarbe(m, threshold);
+  const numTxt = m<=0 ? "jetzt" : String(m);
+  const unitTxt = m<=0 ? "" : "min";
   return `<span class="tcell">
-    <span class="tnum" style="color:${col}">${m}</span>
+    <span class="tbar" style="background:${col}"></span>
+    <span class="tnum">${numTxt}</span>
     <span class="tright">
-      <span class="tdel" style="opacity:${delay>0?1:0}">${delay>0?'+'+delay:'·'}</span>
-      <span class="tunit">min</span>
+      <span class="tdel" style="opacity:${delay>0?1:0}">${delay>0?'+'+delay:'+'}</span>
+      <span class="tunit">${unitTxt}</span>
     </span>
   </span>`;
 }
@@ -150,7 +139,7 @@ function matcht(dep,weg){
     const f=weg.filterLine.toUpperCase().replace("TRAM ","").replace("BUS ","").trim();
     if(!label.startsWith(f)) return false;
   }
-  if(weg.filterZiel && !ziel.includes(weg.filterZiel.toLowerCase())) return false;
+  if(weg.filterZiel&&!ziel.includes(weg.filterZiel.toLowerCase())) return false;
   return true;
 }
 function minuten(dep){ return Math.round(((dep.realtimeDepartureTime||dep.plannedDepartureTime)-Date.now())/60000); }
@@ -159,7 +148,7 @@ async function renderWeg(weg){
   const el=document.createElement("div");el.className="card";
   el.innerHTML=`<div class="station">${weg.person}</div>`;
   try{
-    let deps=(await abfahrten(weg.id)).filter(d=>!d.cancelled && matcht(d,weg) && minuten(d)>=0);
+    let deps=(await abfahrten(weg.id)).filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=0);
     deps.sort((a,b)=>{
       if(PRIO_UBAHN){
         const ua=(a.transportType==="UBAHN")?0:1,ub=(b.transportType==="UBAHN")?0:1;
@@ -174,7 +163,7 @@ async function renderWeg(weg){
       el.innerHTML+=`<div class="row">
         <span class="badge" style="background:${farbe(d.label)}">${d.label||"?"}</span>
         <span class="dest">${d.destination||""}</span>
-        ${zeitHtml(m, d.delayInMinutes||0, weg.threshold)}
+        ${zeitHtml(m,d.delayInMinutes||0,weg.threshold)}
       </div>`;
     }
   }catch(e){ el.innerHTML+=`<div class="err">⚠️ ${e.message}</div>`; }
