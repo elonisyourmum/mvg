@@ -5,52 +5,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MVV Abfahrten</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Fjalla+One&family=Barlow+Semi+Condensed:wght@500;600&family=DM+Mono:wght@500&display=swap');
- 
   :root{
     --bg:#0a0c0f; --panel:#13171d; --line:#222a33;
     --ink:#f2f5f8; --muted:#7c8896; --mvv:#00a13a;
     --amber:#ffb000; --soon:#ff5a4d;
-    --ubahn:#0065ae; --sbahn:#00903a; --rest:#d11e2a;
+    --sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Arial,sans-serif;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{
-    font-family:'Barlow Semi Condensed',sans-serif;
+    font-family:var(--sys);
     background:var(--bg);color:var(--ink);
-    padding:2.4vmin 3.2vmin 4vmin;
+    padding:2vmin 2.6vmin 3vmin;
     overflow-y:auto;min-height:100vh;user-select:none;
+    -webkit-font-smoothing:antialiased;
   }
   .topbar{
-    display:flex;align-items:center;gap:1.4vmin;
+    display:flex;align-items:center;gap:1.2vmin;
     border-bottom:2px solid var(--mvv);
-    padding-bottom:1.1vmin;margin-bottom:1.6vmin;
+    padding-bottom:.9vmin;margin-bottom:1.3vmin;
     position:sticky;top:0;background:var(--bg);z-index:5;
   }
   .logo{
-    font-family:'Fjalla One',sans-serif;background:var(--mvv);color:#fff;
-    font-size:clamp(1rem,3.6vmin,1.5rem);line-height:1;letter-spacing:.06em;
-    padding:.3em .48em .24em;border-radius:8px;
+    background:var(--mvv);color:#fff;font-weight:700;
+    font-size:clamp(.85rem,3vmin,1.25rem);line-height:1;letter-spacing:.04em;
+    padding:.28em .46em;border-radius:7px;
   }
-  .topbar h1{font-family:'Fjalla One',sans-serif;font-size:clamp(1rem,3.4vmin,1.4rem);letter-spacing:.05em;text-transform:uppercase;font-weight:400;}
-  .topbar .clock{margin-left:auto;font-family:'DM Mono',monospace;color:var(--amber);font-size:clamp(1rem,3.4vmin,1.4rem);}
- 
-  .board{display:flex;flex-direction:column;gap:1.3vmin;}
-  .weg{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1.2vmin 1.5vmin;}
-  .weg-head{margin-bottom:.7vmin;}
-  .person{font-family:'Fjalla One',sans-serif;font-size:clamp(.95rem,3vmin,1.3rem);letter-spacing:.02em;}
- 
-  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.8rem;
-       padding:.6vmin 0;border-top:1px solid var(--line);}
+  .topbar h1{font-size:clamp(.85rem,2.9vmin,1.2rem);letter-spacing:.04em;text-transform:uppercase;font-weight:700;}
+  .topbar .clock{margin-left:auto;color:var(--amber);font-size:clamp(.9rem,3vmin,1.25rem);font-weight:600;font-variant-numeric:tabular-nums;}
+
+  .board{display:flex;flex-direction:column;gap:1vmin;}
+  .weg{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:.9vmin 1.2vmin;}
+  .person{font-weight:700;font-size:clamp(.9rem,2.8vmin,1.2rem);letter-spacing:.01em;margin-bottom:.4vmin;}
+
+  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.7rem;
+       padding:.42vmin 0;border-top:1px solid var(--line);}
   .row:first-of-type{border-top:none;}
-  .badge{font-family:'Fjalla One',sans-serif;color:#fff;border-radius:6px;
-         padding:.16em .5em;min-width:2.4em;text-align:center;font-size:clamp(.8rem,2.5vmin,1.05rem);}
-  .dest{font-size:clamp(.85rem,2.6vmin,1.1rem);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .min{font-family:'DM Mono',monospace;font-size:clamp(.85rem,2.7vmin,1.15rem);color:var(--amber);text-align:right;white-space:nowrap;}
+  .badge{color:#fff;border-radius:5px;font-weight:700;
+         padding:.12em .42em;min-width:2.3em;text-align:center;font-size:clamp(.75rem,2.4vmin,1rem);}
+  .dest{font-size:clamp(.8rem,2.5vmin,1.05rem);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .min{font-size:clamp(.8rem,2.5vmin,1.05rem);color:var(--amber);text-align:right;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums;}
   .min.soon{color:var(--soon);}
-  .delay{color:var(--soon);font-size:.7em;}
-  .empty,.err{color:var(--muted);font-size:clamp(.8rem,2.4vmin,1rem);padding:.5vmin 0;}
+  .delay{color:var(--soon);font-size:.72em;}
+  .empty,.err{color:var(--muted);font-size:clamp(.78rem,2.3vmin,.95rem);padding:.4vmin 0;}
   .err{color:var(--soon);}
-  .updated{text-align:right;color:var(--muted);font-size:.75rem;font-family:'DM Mono',monospace;margin-top:1.4vmin;}
+  .updated{text-align:right;color:var(--muted);font-size:.72rem;margin-top:1vmin;font-variant-numeric:tabular-nums;}
 </style>
 </head>
 <body>
@@ -61,7 +59,7 @@
   </div>
   <div class="board" id="board"></div>
   <div class="updated" id="updated"></div>
- 
+
 <script>
 const WEGE = [
   { person: "Silberhornstraße",  id: "de:09162:1170", filterLine: "", filterZiel: "" },
@@ -69,14 +67,14 @@ const WEGE = [
   { person: "St.-Martin-Straße", id: "de:09162:1100", filterLine: "", filterZiel: "" },
   { person: "Kolumbusplatz",     id: "de:09162:160",  filterLine: "", filterZiel: "" },
 ];
- 
+
 const PRIO_UBAHN = true;
-const PRO_WEG    = 6;        // Fahrzeuge pro Station
+const PRO_WEG    = 6;
 const INTERVALL  = 30000;
- 
+
 const API = "https://www.mvg.de/api/bgw-pt/v3";
-const PROXIES = [""];        // Fully Kiosk: "Disable Web Security" muss AN sein
- 
+const PROXIES = [""];   // Fully Kiosk: "Disable Web Security" muss AN sein
+
 async function holen(url){
   let lastErr;
   for(const p of PROXIES){
@@ -89,17 +87,22 @@ async function holen(url){
   }
   throw lastErr || new Error("Kein Zugriff");
 }
- 
-/* U-Bahn blau, S-Bahn grün, alles andere rot */
+
+/* Echte Münchner Linienfarben (Annäherung an die offiziellen Werte) */
+const LINIEN = {
+  U1:"#438136", U2:"#C20831", U3:"#EC6726", U4:"#00A984", U5:"#BC7A00", U6:"#0065B1", U7:"#C20831", U8:"#EC6726",
+  S1:"#16BAE7", S2:"#76B82A", S3:"#9B268F", S4:"#E30613", S5:"#F39200", S6:"#00975F", S7:"#943126", S8:"#5A5A5A", S20:"#ED6B22"
+};
 function farbe(label){
   const l=(label||"").toUpperCase();
-  if(l.startsWith("U")) return "var(--ubahn)";
-  if(l.startsWith("S")) return "var(--sbahn)";
-  return "var(--rest)";
+  if(LINIEN[l]) return LINIEN[l];
+  if(l.startsWith("S")) return "#00903a";  // sonstige S-Bahn grün
+  if(l.startsWith("U")) return "#0065B1";  // sonstige U-Bahn blau
+  return "#d11e2a";                         // Tram/Bus rot
 }
- 
+
 async function abfahrten(id){ return await holen(`${API}/departures?globalId=${id}&limit=20`); }
- 
+
 function matcht(dep,weg){
   const label=(dep.label||"").toUpperCase();
   const ziel =(dep.destination||"").toLowerCase();
@@ -111,10 +114,10 @@ function matcht(dep,weg){
   return true;
 }
 function minuten(dep){ return Math.round(((dep.realtimeDepartureTime||dep.plannedDepartureTime)-Date.now())/60000); }
- 
+
 async function renderWeg(weg){
   const el=document.createElement("div");el.className="weg";
-  el.innerHTML=`<div class="weg-head"><span class="person">${weg.person}</span></div>`;
+  el.innerHTML=`<div class="person">${weg.person}</div>`;
   try{
     let deps=(await abfahrten(weg.id)).filter(d=>!d.cancelled && matcht(d,weg) && minuten(d)>=0);
     deps.sort((a,b)=>{
@@ -137,7 +140,7 @@ async function renderWeg(weg){
   }catch(e){ el.innerHTML+=`<div class="err">⚠️ ${e.message||"Fehler beim Laden"}</div>`; }
   return el;
 }
- 
+
 async function update(){
   const teile=await Promise.all(WEGE.map(renderWeg));
   document.getElementById("board").replaceChildren(...teile);
