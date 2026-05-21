@@ -6,67 +6,55 @@
 <title>MVV Abfahrten</title>
 <style>
   :root{
-    --bg:#0b0d10; --panel:#15181d; --line:#23272e;
-    --ink:#f3f5f7; --muted:#828c98; --mvv:#00a13a;
-    --amber:#ffc15e; --soon:#ff6b5a;
-    --sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Arial,sans-serif;
-    --mono:"SF Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
+    --bg:#0e1116; --card:#171b22; --line:#242a33;
+    --ink:#f4f6f8; --muted:#8b95a1; --mvv:#00a13a;
+    --soon:#ff6b5a;
+    --sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI","Helvetica Neue",Arial,sans-serif;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{
     font-family:var(--sys);background:var(--bg);color:var(--ink);
-    padding:2vmin 2.6vmin 3vmin;overflow-y:auto;min-height:100vh;user-select:none;
-    -webkit-font-smoothing:antialiased;
+    padding:2.2vmin 2.8vmin 3vmin;overflow-y:auto;min-height:100vh;user-select:none;
+    -webkit-font-smoothing:antialiased;letter-spacing:.005em;
   }
   .topbar{
     display:flex;align-items:center;gap:1.2vmin;
+    padding-bottom:1.4vmin;margin-bottom:1.8vmin;
     border-bottom:1px solid var(--line);
-    padding-bottom:1.1vmin;margin-bottom:1.5vmin;
     position:sticky;top:0;background:var(--bg);z-index:5;
   }
   .logo{background:var(--mvv);color:#fff;font-weight:700;
-        font-size:clamp(.8rem,2.8vmin,1.15rem);line-height:1;letter-spacing:.03em;
-        padding:.3em .48em;border-radius:7px;}
-  .topbar h1{font-size:clamp(.85rem,2.8vmin,1.15rem);letter-spacing:.02em;font-weight:600;}
-  .topbar .clock{margin-left:auto;color:var(--ink);font-size:clamp(.9rem,3vmin,1.2rem);
-                 font-weight:600;font-variant-numeric:tabular-nums;}
+        font-size:clamp(.8rem,2.7vmin,1.1rem);line-height:1;letter-spacing:.02em;
+        padding:.32em .5em;border-radius:8px;}
+  .topbar h1{font-size:clamp(.85rem,2.7vmin,1.12rem);font-weight:600;}
+  .topbar .clock{margin-left:auto;color:var(--muted);font-size:clamp(.85rem,2.7vmin,1.1rem);
+                 font-weight:500;font-variant-numeric:tabular-nums;}
 
-  .board{display:flex;flex-direction:column;gap:1.1vmin;}
-  .weg{background:var(--panel);border-radius:14px;padding:1vmin 1.4vmin .6vmin;}
-  .person{font-weight:600;font-size:clamp(.9rem,2.8vmin,1.18rem);
-          margin-bottom:.5vmin;color:var(--ink);}
+  .board{display:flex;flex-direction:column;gap:1.3vmin;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:1.3vmin 1.6vmin .8vmin;}
+  .station{display:flex;align-items:center;gap:.5em;font-weight:600;
+           font-size:clamp(.92rem,2.8vmin,1.18rem);margin-bottom:.7vmin;}
 
-  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.7rem;
-       padding:.55vmin 0;}
+  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.8rem;
+       padding:.62vmin 0;}
   .row + .row{border-top:1px solid var(--line);}
-  .badge{color:#fff;border-radius:6px;font-weight:700;
-         padding:.14em .46em;min-width:2.3em;text-align:center;
-         font-size:clamp(.75rem,2.4vmin,1rem);}
-  .dest{font-size:clamp(.82rem,2.6vmin,1.08rem);font-weight:400;color:#dfe3e8;
+  .badge{color:#fff;border-radius:7px;font-weight:700;
+         padding:.16em .5em;min-width:2.4em;text-align:center;
+         font-size:clamp(.74rem,2.3vmin,.98rem);letter-spacing:.01em;}
+  .dest{font-size:clamp(.84rem,2.6vmin,1.08rem);font-weight:400;color:#d6dbe1;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .time{display:inline-flex;align-items:baseline;gap:.25em;white-space:nowrap;}
+  .num{font-size:clamp(.95rem,2.9vmin,1.22rem);font-weight:600;color:var(--ink);
+       font-variant-numeric:tabular-nums;}
+  .time.soon .num{color:var(--soon);}
+  .unit{font-size:clamp(.72rem,2.1vmin,.85rem);color:var(--muted);font-weight:500;}
+  .delay{color:var(--soon);font-size:.74em;font-weight:600;margin-left:.15em;}
 
-  /* Split-Flap / Zifferntafel-Look für die Zeit */
-  .min{display:inline-flex;align-items:center;gap:.28em;justify-content:flex-end;
-       color:var(--amber);white-space:nowrap;}
-  .min.soon{color:var(--soon);}
-  .flap{display:inline-flex;gap:2px;}
-  .flap b{
-    position:relative;display:inline-block;min-width:1.05em;text-align:center;
-    font-family:var(--mono);font-weight:700;color:currentColor;
-    font-size:clamp(.82rem,2.6vmin,1.06rem);line-height:1.25;
-    padding:.12em .12em;border-radius:4px;
-    background:linear-gradient(#2b313d 0 50%, #1e242d 50% 100%);
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.05), 0 1px 1px rgba(0,0,0,.4);
-  }
-  .flap b::after{content:"";position:absolute;left:6%;right:6%;top:50%;height:1px;
-                 background:rgba(0,0,0,.6);transform:translateY(-.5px);}
-  .unit{font-size:.72em;color:var(--muted);font-weight:600;letter-spacing:.02em;}
-  .delay{color:var(--soon);font-size:.7em;font-weight:700;}
-
-  .empty,.err{color:var(--muted);font-size:clamp(.78rem,2.3vmin,.95rem);padding:.4vmin 0;}
+  .empty,.err{color:var(--muted);font-size:clamp(.78rem,2.3vmin,.95rem);padding:.5vmin 0;}
   .err{color:var(--soon);}
-  .updated{text-align:right;color:var(--muted);font-size:.72rem;margin-top:1vmin;
-           font-variant-numeric:tabular-nums;}
+  .updated{text-align:right;color:var(--muted);font-size:.72rem;margin-top:1.2vmin;
+           font-variant-numeric:tabular-nums;opacity:.7;}
 </style>
 </head>
 <body>
@@ -118,9 +106,6 @@ function farbe(label){
   return "#d11e2a";
 }
 
-/* erzeugt die Kachel-Ziffern */
-function flap(str){ return `<span class="flap">`+[...str].map(c=>`<b>${c}</b>`).join("")+`</span>`; }
-
 async function abfahrten(id){ return await holen(`${API}/departures?globalId=${id}&limit=20`); }
 
 function matcht(dep,weg){
@@ -136,8 +121,8 @@ function matcht(dep,weg){
 function minuten(dep){ return Math.round(((dep.realtimeDepartureTime||dep.plannedDepartureTime)-Date.now())/60000); }
 
 async function renderWeg(weg){
-  const el=document.createElement("div");el.className="weg";
-  el.innerHTML=`<div class="person">${weg.person}</div>`;
+  const el=document.createElement("div");el.className="card";
+  el.innerHTML=`<div class="station">${weg.person}</div>`;
   try{
     let deps=(await abfahrten(weg.id)).filter(d=>!d.cancelled && matcht(d,weg) && minuten(d)>=0);
     deps.sort((a,b)=>{
@@ -151,12 +136,13 @@ async function renderWeg(weg){
     if(deps.length===0){ el.innerHTML+=`<div class="empty">Keine passenden Abfahrten</div>`; }
     else for(const d of deps){
       const m=minuten(d);
-      const zeit = m<=0 ? flap("JETZT") : flap(String(m))+`<span class="unit">min</span>`;
+      const zeit = m<=0 ? `<span class="num">jetzt</span>`
+                        : `<span class="num">${m}</span><span class="unit">min</span>`;
       const delay=(d.delayInMinutes>0)?`<span class="delay">+${d.delayInMinutes}</span>`:"";
       el.innerHTML+=`<div class="row">
           <span class="badge" style="background:${farbe(d.label)}">${d.label||"?"}</span>
           <span class="dest">${d.destination||""}</span>
-          <span class="min ${m<=2?'soon':''}">${zeit}${delay}</span></div>`;
+          <span class="time ${m<=2?'soon':''}">${zeit}${delay}</span></div>`;
     }
   }catch(e){ el.innerHTML+=`<div class="err">⚠️ ${e.message||"Fehler beim Laden"}</div>`; }
   return el;
@@ -166,7 +152,7 @@ async function update(){
   const teile=await Promise.all(WEGE.map(renderWeg));
   document.getElementById("board").replaceChildren(...teile);
   document.getElementById("updated").textContent=
-    "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
 }
 function clock(){ document.getElementById("clock").textContent=new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}); }
 clock(); setInterval(clock,10000);
