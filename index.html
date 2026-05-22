@@ -25,8 +25,11 @@
   .topbar h1{font-size:clamp(.86rem,2.8vmin,1.1rem);font-weight:600;}
   .tbar-right{display:flex;align-items:center;gap:1em;margin-left:auto;}
   #weather{font-size:clamp(.74rem,2.3vmin,.95rem);color:var(--muted);white-space:nowrap;}
-  #reload{display:inline-block;font-size:1em;color:var(--muted);opacity:.6;
-          animation:spin 3s linear infinite;will-change:transform;}
+  #reload{display:inline-block;width:.85em;height:.85em;border-radius:50%;
+           border:2px solid rgba(139,149,161,.35);border-top-color:var(--muted);
+           opacity:.7;vertical-align:middle;transition:border-color .4s ease;}
+  #reload.spinning{animation:spin .9s linear infinite;}
+  #reload.fresh{border-color:var(--gruen);opacity:1;}
   @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
   .clock{color:var(--muted);font-size:clamp(.86rem,2.8vmin,1.06rem);font-weight:500;font-variant-numeric:tabular-nums;}
 
@@ -84,7 +87,7 @@
     <h1>Abfahrten</h1>
     <div class="tbar-right">
       <span id="weather"></span>
-      <span id="reload">↻</span>
+      <span id="reload"></span>
       <span class="clock" id="clock">--:--</span>
     </div>
   </div>
@@ -276,7 +279,12 @@ async function fetchStop(id){
   catch(e){errCache[id]=e.message||"Fehler";clearTimeout(retryTmr[id]);
             retryTmr[id]=setTimeout(()=>fetchStop(id),RETRY_MS);}}
 
-async function fetchAll(){await Promise.all(WEGE.map(w=>fetchStop(w.id)));}
+async function fetchAll(){
+  const rl=document.getElementById("reload");
+  if(rl)rl.classList.add("spinning");
+  await Promise.all(WEGE.map(w=>fetchStop(w.id)));
+  if(rl)rl.classList.remove("spinning");
+}
 
 async function fetchMessages(){
   try{
@@ -315,8 +323,7 @@ function renderAll(){
   lastRenderTime=Date.now();
   // Grün sofort setzen wenn DOM bereit (unabhängig vom 1s Clock-Tick)
   const rl=document.getElementById("reload");
-  if(rl){rl.style.transition="none";rl.style.color="var(--gruen)";rl.style.opacity="1";
-    setTimeout(()=>{rl.style.transition="color 1.2s ease, opacity 1.2s ease";rl.style.color="var(--muted)";rl.style.opacity=".6";},800);}
+  if(rl){rl.classList.add("fresh");setTimeout(()=>rl.classList.remove("fresh"),900);}
   WEGE.forEach(updateStation);
   const board=document.getElementById("board");
   let ts=document.getElementById("updated");
@@ -343,8 +350,8 @@ function clock(){
   if(!age)return;
   // Stale: reload rot blinken wenn keine Verbindung
   const rl=document.getElementById("reload");
-  if(rl&&Date.now()-lastFetchOk>STALE_MS){
-    rl.style.color="var(--rot)";rl.style.opacity="1";}}
+  if(rl){const stale=Date.now()-lastFetchOk>STALE_MS;
+    rl.style.borderTopColor=stale?"var(--rot)":"";rl.style.opacity=stale?"1":"";}}
 
 clock();setInterval(clock,1000);
 fetchWeather();setInterval(fetchWeather,600000);
