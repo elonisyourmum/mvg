@@ -30,6 +30,12 @@
 
   /* ── Abfahrten ── */
   .board{display:flex;flex-direction:column;gap:1.1vmin;padding:1.5vmin 2.5vmin .5vmin;}
+
+  /* Querformat: 2×2-Raster */
+  @media (orientation:landscape){
+    .board{display:grid;grid-template-columns:1fr 1fr;gap:1vmin 1.4vmin;align-items:start;}
+    #updated{grid-column:1 / -1;}
+  }
   .card{background:var(--card);border:1px solid var(--line);border-radius:13px;
         padding:1.1vmin 1.5vmin .55vmin;overflow:hidden;}
   .station{display:flex;align-items:baseline;gap:.4em;margin-bottom:.55vmin;}
@@ -50,12 +56,11 @@
   .tunit{font-size:.67em;color:var(--muted);font-weight:500;}
   .tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.15;transform:scale(.6);}}
-  .tdot.urgent{transition:opacity 300ms ease,transform 300ms ease;}
-  #board.pulse-dim .tdot.urgent{opacity:.15;transform:scale(.6);}
+  .tdot.urgent{animation:pulse 1.8s ease-in-out infinite;}
   .card-msg{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
   .card-msg.err{color:var(--rot);}
 
-  /* ── Bottom Nav ── */
+  /* ── Bottom Nav ──
   .updated{text-align:center;color:var(--muted);font-size:.74rem;font-weight:400;
            margin-top:.9vmin;font-variant-numeric:tabular-nums;opacity:.6;}
 </style>
@@ -70,7 +75,6 @@
     </div>
   </div>
   <div class="board" id="board"></div>
-  <div id="updated" class="updated"></div>
 <script>
 /* ══ Konfiguration ══════════════════════════════════════════════════ */
 const WEGE=[
@@ -114,7 +118,7 @@ const state={};
 
 function fillRowEl(el,d,weg){
   const m=minuten(d),col=statusFarbe(m,weg.threshold);
-  const del="";
+  const del=m<=1?`;animation-delay:${-(Date.now()%1800)}ms`:"";
   el.innerHTML=`
     <span class="badge" style="background:${farbe(d.label,d.transportType)}">${d.label||"?"}</span>
     <span class="dest">${d.destination||""}</span>
@@ -132,13 +136,13 @@ function updateRowEl(el,d,weg){
   if(tunit)tunit.textContent=m<=0?"":"min";
   if(tdot){tdot.style.background=col;
     const urg=m<=1,was=tdot.classList.contains("urgent");
-    if(urg&&!was){tdot.classList.add("urgent");}
-    else if(!urg&&was){tdot.classList.remove("urgent");}}}
+    if(urg&&!was){tdot.style.animationDelay=`${-(Date.now()%1800)}ms`;tdot.classList.add("urgent");}
+    else if(!urg&&was){tdot.classList.remove("urgent");tdot.style.animationDelay="";}}}
 
 function updateStation(weg){
   if(!state[weg.id]){
     const c=document.createElement("div");c.className="card";
-    c.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="thresh">~${weg.threshold} min</span></div>`;
+    c.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="thresh">~${weg.threshold+1} min</span></div>`;
     state[weg.id]={cardEl:c,rows:new Map()};
     document.getElementById("board").appendChild(c);}
   const{cardEl,rows}=state[weg.id];
@@ -205,35 +209,32 @@ async function fetchWeather(){
 /* ══ Render-Loop ════════════════════════════════════════════════════ */
 function renderAll(){
   WEGE.forEach(updateStation);
-  document.getElementById("updated").textContent=
-    "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
-
-function resetMinHeights(){
-  minHeightSet=false;
-  Object.values(state).forEach(s=>{if(s.cardEl)s.cardEl.style.minHeight="";});}
+  const board=document.getElementById("board");
+  let ts=document.getElementById("updated");
+  if(!ts){ts=document.createElement("div");ts.id="updated";ts.className="updated";}
+  board.appendChild(ts);
+  ts.textContent="aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
 
 function setMinHeights(){
   if(minHeightSet)return;minHeightSet=true;
+  // Warten bis Zeilen-Animationen (enterDelay 60ms + expand 600ms) fertig sind
   requestAnimationFrame(()=>{
     Object.values(state).forEach(s=>{
       if(s.cardEl){
-        s.cardEl.style.minHeight="";
+        s.cardEl.style.minHeight=""; // reset first
         const h=s.cardEl.getBoundingClientRect().height;
-        if(h>0)s.cardEl.style.minHeight=h+"px";
+        if(h>0) s.cardEl.style.minHeight=h+"px";
       }
     });
   });}
 
-window.addEventListener("resize",resetMinHeights);
-
 function clock(){document.getElementById("clock").textContent=
   new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});}
 
-setInterval(()=>document.getElementById("board").classList.toggle("pulse-dim"),1800);
-clock();setInterval(clock,1000);
+clock();setInterval(clock,10000);
 fetchWeather();setInterval(fetchWeather,600000);
 renderAll();
-(async()=>{await fetchAll();renderAll();setTimeout(setMinHeights,800);})();
+fetchAll().then(()=>{ renderAll(); setTimeout(setMinHeights, 800); });
 setInterval(renderAll,RENDER_INT);
 setInterval(()=>fetchAll().then(renderAll),FETCH_INT);
 </script>
