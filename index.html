@@ -95,10 +95,11 @@
 <script>
 /* ══ Konfiguration ══════════════════════════════════════════════════ */
 const WEGE=[
-  {person:"Silberhornstraße", id:"de:09162:1170",threshold:9, filterLine:"U",filterZiel:""},
-  {person:"Ostfriedhof",      id:"de:09162:1105",threshold:3, filterLine:"", filterZiel:""},
-  {person:"St.-Martin-Straße",id:"de:09162:1100",threshold:14,filterLine:"", filterZiel:""},
-  {person:"Kolumbusplatz",    id:"de:09162:160", threshold:11,filterLine:"U",filterZiel:""},
+  // minMin = ab wie vielen Minuten Abfahrten gezeigt werden (versteckt "jetzt"/unerreichbare)
+  {person:"Silberhornstraße", id:"de:09162:1170",threshold:9, filterLine:"U",filterZiel:"",minMin:1},
+  {person:"Ostfriedhof",      id:"de:09162:1105",threshold:3, filterLine:"", filterZiel:"",minMin:2},
+  {person:"St.-Martin-Straße",id:"de:09162:1100",threshold:14,filterLine:"", filterZiel:"",minMin:1},
+  {person:"Kolumbusplatz",    id:"de:09162:160", threshold:11,filterLine:"U",filterZiel:"",minMin:1},
 ];
 
 
@@ -112,7 +113,6 @@ const STALE_MS=120000; // 2 min ohne erfolgreichen Fetch = veraltet
 const STOERUNG_INT=300000; // Störungen alle 5 min abrufen
 let stoerungenByLine={}; // { 'U2': 'Titel', ... }
 let minHeightSet=false;
-let isFetching=false; // Guard gegen gleichzeitige Fetch-Aufrufe (z.B. nach Screen-Wakeup)
 
 /* ══ Helpers ════════════════════════════════════════════════════════ */
 function getKey(d){return`${d.label}|${d.destination}|${d.plannedDepartureTime}`;}
@@ -175,7 +175,7 @@ function updateStation(weg){
     msg.className=`card-msg ${errCache[weg.id]?"err":""}`;
     msg.textContent=errCache[weg.id]?`⚠️ ${errCache[weg.id]} – Retry…`:"Lade…";return;}
   if(msg)msg.remove();
-  let deps=raw.filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=0);
+  let deps=raw.filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=(weg.minMin??1));
   deps.sort((a,b)=>minuten(a)-minuten(b));deps=deps.slice(0,PRO_WEG);
   const sortedKeys=deps.map(getKey);
   const newKeySet=new Set(sortedKeys);
@@ -280,21 +280,15 @@ async function fetchStop(id){
   catch(e){errCache[id]=e.message||"Fehler";clearTimeout(retryTmr[id]);
             retryTmr[id]=setTimeout(()=>fetchStop(id),RETRY_MS);}}
 
+let _fetching=false;
 async function fetchAll(){
-  if(isFetching) return; // Abbrechen, falls bereits ein Abruf läuft
-  isFetching = true;
-
+  if(_fetching)return; // kein paralleler Fetch (z.B. nach Screen-Wake)
+  _fetching=true;
   const rl=document.getElementById("reload");
   if(rl)rl.classList.add("spinning");
-  
-  try {
-    await Promise.all(WEGE.map(w=>fetchStop(w.id)));
-  } catch(e) {
-    /* Fehler werden bereits pro Stop in fetchStop abgefangen */
-  } finally {
-    if(rl)rl.classList.remove("spinning");
-    isFetching = false; // Schild wieder freigeben
-  }
+  await Promise.all(WEGE.map(w=>fetchStop(w.id)));
+  if(rl)rl.classList.remove("spinning");
+  _fetching=false;
 }
 
 async function fetchMessages(){
