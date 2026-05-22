@@ -229,7 +229,7 @@ window.addEventListener("resize",resetMinHeights);
 function clock(){document.getElementById("clock").textContent=
   new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});}
 
-setInterval(()=>document.getElementById("board").classList.toggle("pulse-dim"),900);
+setInterval(()=>document.getElementById("board").classList.toggle("pulse-dim"),1800);
 clock();setInterval(clock,1000);
 fetchWeather();setInterval(fetchWeather,600000);
 renderAll();
