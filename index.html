@@ -184,7 +184,7 @@ function updateStation(weg){
   const newKeySet=new Set(deps.map(getKey));
 
   /* Phasen-Timing */
-  const FADE=380, COLLAPSE=460;  // ms
+  const FADE=600, COLLAPSE=750;  // ms
 
   /* Abgefahrene Zeilen gestaffelt entfernen:
      Phase 1 verblassen (Höhe bleibt) → Phase 2 kollabieren (alles rutscht hoch) */
@@ -217,18 +217,27 @@ function updateStation(weg){
     if(rows.has(key)) updateRowEl(rows.get(key),d,weg);
   }
 
-  /* Neue Zeilen: erst NACH Verblassen+Kollabieren unten einblenden */
-  const enterDelay = hadDeparture ? FADE+COLLAPSE : 60;
+  /* Neue Zeilen: startet ohne Höhe (Karte wächst nicht vorzeitig),
+     expandiert + blendet ein NACH dem Kollabieren der alten Zeile */
+  const enterDelay = hadDeparture ? FADE+COLLAPSE+40 : 60;
   for(const d of deps){
     const key=getKey(d);
     if(!rows.has(key)){
       const rowEl=createRowEl(d,weg);
+      rowEl.style.maxHeight="0";
+      rowEl.style.paddingTop="0";
+      rowEl.style.paddingBottom="0";
       rowEl.style.opacity="0";
       cardEl.appendChild(rowEl);
       rows.set(key,rowEl);
       setTimeout(()=>{
-        rowEl.style.transition="opacity 380ms ease";
+        rowEl.style.transition=`max-height ${COLLAPSE}ms ease, padding ${COLLAPSE}ms ease, opacity ${FADE}ms ease`;
+        rowEl.style.maxHeight="80px";
+        rowEl.style.paddingTop="";
+        rowEl.style.paddingBottom="";
         rowEl.style.opacity="1";
+        // max-height nach Animation auf auto setzen (kein Clipping bei großem Content)
+        setTimeout(()=>{ rowEl.style.maxHeight=""; rowEl.style.transition=""; }, COLLAPSE+20);
       }, enterDelay);
     }
   }
