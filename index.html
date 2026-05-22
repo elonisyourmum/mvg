@@ -38,11 +38,7 @@
   .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);}
   /* Schwellenwert-Hinweis neben dem Stationsnamen */
   .thresh{font-size:.65em;color:var(--muted);font-weight:400;letter-spacing:.01em;}
-  .hsym{display:inline-flex;align-items:center;justify-content:center;
-        width:1.15em;height:1.15em;border-radius:50%;
-        background:#FFD700;color:#000000;
-        font-size:.7em;font-weight:900;line-height:1;flex-shrink:0;}
-
+  
   .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.65rem;
        padding:.46vmin 0;}
   .row + .row{border-top:1px solid var(--line);}
@@ -160,7 +156,6 @@ function matcht(dep,weg){
 function renderWeg(weg){
   const el=document.createElement("div");el.className="card";
   el.innerHTML=`<div class="station">
-    <span class="hsym">H</span>
     <span class="sname">${weg.person}</span>
     <span class="thresh">~${weg.threshold+1} min</span>
   </div>`;
