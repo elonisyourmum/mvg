@@ -101,7 +101,7 @@ const FADE=500,COLLAPSE=600,PULSE_MS=1800; // PULSE_MS muss = CSS pulse-Dauer (1
 const API="https://www.mvg.de/api/bgw-pt/v3";
 const PROXIES=[""];
 const depCache={},errCache={},retryTmr={};
-let lastFetchOk=Date.now();
+let lastFetchOk=Date.now(),lastRenderTime=Date.now();
 const STALE_MS=120000; // 2 min ohne erfolgreichen Fetch = veraltet
 const STOERUNG_INT=300000; // Störungen alle 5 min abrufen
 let stoerungenByLine={}; // { 'U2': 'Titel', ... }
@@ -309,6 +309,7 @@ async function fetchWeather(){
 
 /* ══ Render-Loop ════════════════════════════════════════════════════ */
 function renderAll(){
+  lastRenderTime=Date.now();
   WEGE.forEach(updateStation);
   const board=document.getElementById("board");
   let ts=document.getElementById("updated");
@@ -333,11 +334,17 @@ function clock(){
     new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
   const age=document.getElementById("age");
   if(!age)return;
-  const sec=Math.round((Date.now()-lastFetchOk)/1000);
-  const stale=sec>STALE_MS/1000;
-  age.textContent=stale?`⚠ veraltet`:`${sec}s`;
-  age.style.color=stale?"var(--rot)":sec>20?"var(--gelb)":"var(--muted)";
-  age.style.fontWeight=stale?"600":"400";}
+  if(Date.now()-lastFetchOk>STALE_MS){
+    age.textContent="⚠ veraltet";age.style.color="var(--rot)";
+    age.style.fontWeight="600";age.style.transition="";return;}
+  const sec=Math.round((Date.now()-lastRenderTime)/1000);
+  age.textContent=`${sec}s`;age.style.fontWeight="400";
+  if(sec===0){
+    age.style.transition="none";age.style.color="var(--gruen)";
+  } else {
+    age.style.transition="color 1.5s ease";
+    age.style.color=sec>8?"var(--gelb)":"var(--muted)";
+  }}
 
 clock();setInterval(clock,1000);
 fetchWeather();setInterval(fetchWeather,600000);
