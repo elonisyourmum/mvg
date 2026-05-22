@@ -33,7 +33,7 @@
 
   /* Querformat: 2×2-Raster */
   @media (orientation:landscape){
-    .board{display:grid;grid-template-columns:1fr 1fr;gap:1vmin 1.4vmin;align-items:start;padding:1vmin 1.5vmin 0.5vmin!important;border-right:1px solid var(--line);margin-right:5vmin;}
+    .board{display:grid;grid-template-columns:1fr 1fr;gap:1vmin 1.4vmin;align-items:start;padding:1vmin 1.5vmin 0.5vmin!important;border-right:1px solid var(--line);margin-right:2.5vmin;}
     #updated{grid-column:1 / -1;font-size:.65rem;margin-top:0.5vmin;}
     .card{padding:0.7vmin 1vmin 0.35vmin;}
     .station{margin-bottom:0.3vmin;}
@@ -47,8 +47,14 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:13px;
         padding:1.1vmin 1.5vmin .55vmin;overflow:hidden;}
   .station{display:flex;align-items:baseline;gap:.4em;margin-bottom:.55vmin;}
-  .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);}
-  .thresh{font-size:.65em;color:var(--muted);font-weight:400;}
+  .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);flex-shrink:0;}
+  .thresh{font-size:.65em;color:var(--muted);font-weight:400;flex-shrink:0;}
+  .stoerung{margin-left:auto;min-width:0;flex:1;overflow:hidden;white-space:nowrap;
+            position:relative;height:1.25em;}
+  .stoerung-inner{position:absolute;white-space:nowrap;color:var(--gelb);
+                  font-size:.72em;font-weight:600;will-change:transform;
+                  animation:marquee 14s linear infinite;}
+  @keyframes marquee{from{transform:translateX(100%);}to{transform:translateX(-100%);}}
   .row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:.65rem;
        padding:.46vmin 0;overflow:hidden;
        transition:opacity 500ms ease,max-height 600ms ease,padding 600ms ease,border-width 600ms ease;}
@@ -100,6 +106,8 @@ const PROXIES=[""];
 const depCache={},errCache={},retryTmr={};
 let lastFetchOk=Date.now();
 const STALE_MS=120000; // 2 min ohne erfolgreichen Fetch = veraltet
+const STOERUNG_INT=300000; // Störungen alle 5 min abrufen
+let stoerungenByLine={}; // { 'U2': 'Titel', ... }
 let minHeightSet=false;
 
 /* ══ Helpers ════════════════════════════════════════════════════════ */
@@ -152,7 +160,7 @@ function updateRowEl(el,d,weg){
 function updateStation(weg){
   if(!state[weg.id]){
     const c=document.createElement("div");c.className="card";
-    c.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="thresh">~${weg.threshold+1} min</span></div>`;
+    c.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="thresh">~${weg.threshold+1} min</span><span class="stoerung"></span></div>`;
     state[weg.id]={cardEl:c,rows:new Map()};
     document.getElementById("board").appendChild(c);}
   const{cardEl,rows}=state[weg.id];
@@ -166,6 +174,22 @@ function updateStation(weg){
   let deps=raw.filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=0);
   deps.sort((a,b)=>minuten(a)-minuten(b));deps=deps.slice(0,PRO_WEG);
   const newKeySet=new Set(deps.map(getKey));
+  // Störungen: betroffene angezeigte Linien
+  const stoerEl=cardEl.querySelector(".stoerung");
+  if(stoerEl){
+    const linien=[...new Set(deps.map(d=>(d.label||"").toUpperCase()))];
+    const betroffen=linien.filter(l=>stoerungenByLine[l]);
+    const txt=betroffen.map(l=>`⚠ ${l}: ${stoerungenByLine[l]}`).join("    •    ");
+    if(stoerEl.dataset.txt!==txt){ // nur bei Änderung neu setzen (Marquee nicht resetten)
+      stoerEl.dataset.txt=txt;
+      if(txt){
+        stoerEl.innerHTML='<span class="stoerung-inner"></span>';
+        const inner=stoerEl.querySelector(".stoerung-inner");
+        inner.textContent=txt;
+        inner.style.animationDuration=Math.max(10,txt.length*0.35)+"s";
+      }else stoerEl.innerHTML="";
+    }
+  }
   let hadDepart=false;
   for(const[key,rowEl]of rows){
     if(!newKeySet.has(key)){
@@ -179,21 +203,25 @@ function updateStation(weg){
       setTimeout(()=>rowEl.remove(),FADE+COLLAPSE+40);}}
   for(const d of deps){const k=getKey(d);if(rows.has(k))updateRowEl(rows.get(k),d,weg);}
   const enterDelay=hadDepart?FADE+COLLAPSE+40:60;
-  for(const d of deps){const k=getKey(d);
+  const sortedKeys=deps.map(getKey);
+  for(let i=0;i<deps.length;i++){
+    const d=deps[i],k=sortedKeys[i];
     if(!rows.has(k)){
       const rowEl=document.createElement("div");rowEl.className="row";
       rowEl.style.maxHeight="0";rowEl.style.paddingTop="0";rowEl.style.paddingBottom="0";rowEl.style.opacity="0";
-      fillRowEl(rowEl,d,weg);cardEl.appendChild(rowEl);rows.set(k,rowEl);
+      fillRowEl(rowEl,d,weg);
+      // Korrekte sortierte Position: vor die nächste bereits vorhandene Zeile einfügen
+      let refEl=null;
+      for(let j=i+1;j<sortedKeys.length;j++){if(rows.has(sortedKeys[j])){refEl=rows.get(sortedKeys[j]);break;}}
+      rows.set(k,rowEl);
+      if(refEl)cardEl.insertBefore(rowEl,refEl);else cardEl.appendChild(rowEl);
       setTimeout(()=>{
         rowEl.style.transition=`max-height ${COLLAPSE}ms ease,padding ${COLLAPSE}ms ease,opacity ${FADE}ms ease`;
-        rowEl.style.maxHeight="80px";rowEl.style.paddingTop="";rowEl.style.paddingBottom="";rowEl.style.opacity="1";
+        rowEl.style.maxHeight="120px";rowEl.style.paddingTop="";rowEl.style.paddingBottom="";rowEl.style.opacity="1";
         setTimeout(()=>{rowEl.style.maxHeight="";rowEl.style.transition="";},COLLAPSE+20);
       },enterDelay);
-    }}
-  // Sortierte DOM-Reihenfolge herstellen (neue Zeilen an korrekter Position)
-  for(const d of deps){const k=getKey(d);const el=rows.get(k);if(el)cardEl.appendChild(el);}}
+    }}}
 
-/\* ══ View-Toggle ════════════════════════════════════════════════════ */
 
 /* ══ API ════════════════════════════════════════════════════════════ */
 async function holen(url){let e;
@@ -208,6 +236,31 @@ async function fetchStop(id){
             retryTmr[id]=setTimeout(()=>fetchStop(id),RETRY_MS);}}
 
 async function fetchAll(){await Promise.all(WEGE.map(w=>fetchStop(w.id)));}
+
+async function fetchMessages(){
+  try{
+    const msgs=await holen(`${API}/messages`);
+    const now=Date.now(),map={};
+    for(const m of (msgs||[])){
+      if(m.type!=="INCIDENT")continue;
+      if(m.validFrom&&m.validFrom>now)continue;
+      if(m.validTo&&m.validTo<now)continue;
+      for(const ln of (m.lines||[])){
+        // Label robust ermitteln (neue API: label; alt: lineNumber+product)
+        let label=ln.label;
+        if(!label&&ln.lineNumber){
+          const p=(ln.product||ln.transportType||"").toUpperCase();
+          const pre=p.includes("UBAHN")?"U":p.includes("SBAHN")?"S":"";
+          const num=String(ln.lineNumber);
+          label=num.toUpperCase().startsWith(pre)&&pre?num:pre+num; // kein doppeltes Präfix
+        }
+        label=(label||"").toUpperCase();
+        if(label&&!map[label])map[label]=m.title||"Störung";
+      }
+    }
+    stoerungenByLine=map;
+  }catch(e){/* Störungen optional */}
+}
 
 async function fetchWeather(){
   try{const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1170&longitude=11.5720&current=temperature_2m,weather_code&timezone=Europe%2FBerlin");
@@ -224,10 +277,10 @@ function renderAll(){
   if(!ts){ts=document.createElement("div");ts.id="updated";ts.className="updated";}
   board.appendChild(ts);
   const stale=Date.now()-lastFetchOk>STALE_MS;
-  const sek=Math.round((Date.now()-lastFetchOk)/60000);
+  const minAlt=Math.round((Date.now()-lastFetchOk)/60000);
   ts.classList.toggle("stale",stale);
   ts.textContent=stale
-    ? `⚠ Daten veraltet (vor ${sek} min) – keine Verbindung?`
+    ? `⚠ Daten veraltet (vor ${minAlt} min) – keine Verbindung?`
     : "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
 
 function setMinHeights(){
@@ -248,6 +301,7 @@ function clock(){document.getElementById("clock").textContent=
 
 clock();setInterval(clock,10000);
 fetchWeather();setInterval(fetchWeather,600000);
+fetchMessages().then(()=>renderAll());setInterval(()=>fetchMessages().then(()=>renderAll()),STOERUNG_INT);
 renderAll();
 // Burn-in-Schutz: Inhalt alle 3 min minimal verschieben (OLED)
 document.body.style.transition="transform 4s ease";
