@@ -133,7 +133,7 @@ function updateRowEl(el,d,weg){
   if(tdot){tdot.style.background=col;
     const urg=m<=1,was=tdot.classList.contains("urgent");
     if(urg&&!was){tdot.classList.add("urgent");}
-    else if(!urg&&was){tdot.classList.remove("urgent");}}
+    else if(!urg&&was){tdot.classList.remove("urgent");}}}
 
 function updateStation(weg){
   if(!state[weg.id]){
