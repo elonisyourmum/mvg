@@ -40,7 +40,7 @@
   .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);}
   .thresh{font-size:.65em;color:var(--muted);font-weight:400;}
 
-  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.65rem;
+  .row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:.65rem;
        padding:.46vmin 0;}
   .row + .row{border-top:1px solid var(--line);}
   .badge{color:#fff;border-radius:6px;font-weight:700;
@@ -48,7 +48,7 @@
          font-size:clamp(.75rem,2.4vmin,.98rem);}
   .dest{font-size:clamp(.84rem,2.7vmin,1.07rem);font-weight:400;color:#d6dbe1;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .plat{font-size:.72em;color:var(--muted);margin-left:.35em;flex-shrink:0;}
+  .plat{font-size:.7em;color:var(--muted);font-weight:500;text-align:right;white-space:nowrap;min-width:2.8em;}
 
   /* Zeitspalte */
   .tcell{display:flex;align-items:center;justify-content:flex-end;gap:.3em;min-width:4.4em;}
@@ -59,7 +59,8 @@
   /* Dot-Indikator */
   .tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.15;transform:scale(.6);}}
-  .tdot.urgent{animation:pulse .9s ease-in-out infinite;}
+  .tdot.urgent{animation:pulse 1.8s ease-in-out infinite;}
+  @keyframes rowIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 
   .empty,.err,.loading{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
   .err{color:var(--rot);}
@@ -112,7 +113,7 @@ async function holen(url){
 /* Wetter via Open-Meteo (CORS-frei, kein Key nötig) */
 async function fetchWeather(){
   try{
-    const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1351&longitude=11.5820&current=temperature_2m,weather_code&timezone=Europe%2FBerlin");
+    const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1170&longitude=11.5720&current=temperature_2m,weather_code&timezone=Europe%2FBerlin");
     const d = await r.json();
     const temp = Math.round(d.current.temperature_2m);
     const code = d.current.weather_code;
@@ -190,15 +191,16 @@ function renderWeg(weg){
   deps.sort((a,b)=>minuten(a)-minuten(b));
   deps=deps.slice(0,PRO_WEG);
   if(deps.length===0){ el.innerHTML+=`<div class="empty">Keine Abfahrten</div>`; return el; }
-  for(const d of deps){
+  deps.forEach((d,i)=>{
     const m=minuten(d);
-    const plat=d.platform?`<span class="plat">· ${d.platform}</span>`:"";
-    el.innerHTML+=`<div class="row">
+    const plat=d.platform?`<span class="plat">Gl.${d.platform}</span>`:`<span class="plat"></span>`;
+    el.innerHTML+=`<div class="row" style="animation:rowIn .3s ease ${i*0.06}s both">
       <span class="badge" style="background:${farbe(d.label,d.transportType)}">${d.label||"?"}</span>
-      <span class="dest">${d.destination||""}${plat}</span>
+      <span class="dest">${d.destination||""}</span>
+      ${plat}
       ${zeitHtml(m,weg.threshold)}
     </div>`;
-  }
+  });
   return el;
 }
 
