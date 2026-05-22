@@ -172,7 +172,8 @@ function updateStation(weg){
   if(msg)msg.remove();
   let deps=raw.filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=0);
   deps.sort((a,b)=>minuten(a)-minuten(b));deps=deps.slice(0,PRO_WEG);
-  const newKeySet=new Set(deps.map(getKey));
+  const sortedKeys=deps.map(getKey);
+  const newKeySet=new Set(sortedKeys);
   // Störungen: betroffene angezeigte Linien
   const stoerEl=cardEl.querySelector(".stoerung");
   if(stoerEl){
@@ -220,7 +221,7 @@ function updateStation(weg){
   for(const d of deps){const k=getKey(d);if(rows.has(k))updateRowEl(rows.get(k),d,weg);}
 
   // Neue Zeilen anlegen (volle Höhe, opacity 0 – Position macht der Reorder)
-  const sortedKeys=deps.map(getKey),newRows=new Set();
+  const newRows=new Set();
   for(let i=0;i<deps.length;i++){
     const k=sortedKeys[i];
     if(!rows.has(k)){
