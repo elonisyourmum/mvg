@@ -40,30 +40,33 @@
   .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);}
   .thresh{font-size:.65em;color:var(--muted);font-weight:400;}
 
-  .row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:.65rem;
-       padding:.46vmin 0;}
+  /* Zeilen: Transitions für sanfte Zu/Abgänge */
+  .row{
+    display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:.65rem;
+    padding:.46vmin 0;overflow:hidden;
+    transition:max-height .28s ease, opacity .22s ease, transform .22s ease, padding .28s ease;
+  }
   .row + .row{border-top:1px solid var(--line);}
+
   .badge{color:#fff;border-radius:6px;font-weight:700;
          padding:.13em .44em;min-width:2.3em;text-align:center;
          font-size:clamp(.75rem,2.4vmin,.98rem);}
   .dest{font-size:clamp(.84rem,2.7vmin,1.07rem);font-weight:400;color:#d6dbe1;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .plat{font-size:.7em;color:var(--muted);font-weight:500;text-align:right;white-space:nowrap;min-width:2.8em;}
+  .plat{font-size:.7em;color:var(--muted);font-weight:500;text-align:right;
+        white-space:nowrap;min-width:2.8em;}
 
-  /* Zeitspalte */
   .tcell{display:flex;align-items:center;justify-content:flex-end;gap:.3em;min-width:4.4em;}
   .tnum{font-size:clamp(.94rem,3vmin,1.18rem);font-weight:700;color:var(--ink);
-        font-variant-numeric:tabular-nums;line-height:1;}
+        font-variant-numeric:tabular-nums;line-height:1;transition:color .2s;}
   .tunit{font-size:.67em;color:var(--muted);font-weight:500;}
 
-  /* Dot-Indikator */
-  .tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  .tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .3s;}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.15;transform:scale(.6);}}
   .tdot.urgent{animation:pulse 1.8s ease-in-out infinite;}
-  @keyframes rowIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 
-  .empty,.err,.loading{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
-  .err{color:var(--rot);}
+  .card-status{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
+  .card-status.err{color:var(--rot);}
   .updated{text-align:center;color:var(--muted);font-size:.74rem;margin-top:.9vmin;
            font-variant-numeric:tabular-nums;opacity:.6;}
 </style>
@@ -88,131 +91,177 @@ const WEGE = [
   { person:"Kolumbusplatz",     id:"de:09162:160",  threshold:11, filterLine:"U", filterZiel:"" },
 ];
 
-const PRO_WEG    = 6;
-const FETCH_INT  = 30000;
-const RENDER_INT = 10000;
-const RETRY_MS   = 10000;
+const PRO_WEG   = 6;
+const FETCH_INT = 30000;
+const RENDER_INT= 10000;
+const RETRY_MS  = 10000;
 const API = "https://www.mvg.de/api/bgw-pt/v3";
 const PROXIES = [""];
 
 const depCache = {}, errCache = {}, retryTmr = {};
 
-async function holen(url){
-  let lastErr;
-  for(const p of PROXIES){
-    try{
-      const ziel = p ? p+encodeURIComponent(url) : url;
-      const r = await fetch(ziel);
-      if(!r.ok) throw new Error("HTTP "+r.status);
-      return await r.json();
-    }catch(e){ lastErr=e; }
-  }
-  throw lastErr||new Error("Kein Zugriff");
-}
+/* Pro Station: Card-Element + Map von Zeilen-Keys zu Row-Elementen */
+const state = {}; // id → { cardEl, rows: Map<key, rowEl> }
 
-/* Wetter via Open-Meteo (CORS-frei, kein Key nötig) */
-async function fetchWeather(){
-  try{
-    const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1170&longitude=11.5720&current=temperature_2m,weather_code&timezone=Europe%2FBerlin");
-    const d = await r.json();
-    const temp = Math.round(d.current.temperature_2m);
-    const code = d.current.weather_code;
-    const icons = [[0,"☀️"],[3,"⛅"],[48,"🌫️"],[67,"🌧️"],[77,"❄️"],[82,"🌦️"],[99,"⛈️"]];
-    const icon = (icons.find(([c])=>code<=c)||["",""])[1];
-    document.getElementById("weather").textContent = `${icon} ${temp}°`;
-  }catch(e){}
-}
-fetchWeather(); setInterval(fetchWeather, 600000);
+/* ── Hilfsfunktionen ── */
+function getKey(d){ return `${d.label}|${d.destination}|${d.plannedDepartureTime}`; }
+function minuten(d){ return Math.round(((d.realtimeDepartureTime||d.plannedDepartureTime)-Date.now())/60000); }
+function statusFarbe(m,t){ return m<=1?"var(--rot)":m<=t?"var(--gelb)":"var(--gruen)"; }
 
-/* Linienfarben */
-const LINIEN = {
-  U1:"#438136",U2:"#C20831",U3:"#EC6726",U4:"#00A984",U5:"#BC7A00",U6:"#0065B1",U7:"#C20831",U8:"#EC6726",
-  S1:"#16BAE7",S2:"#76B82A",S3:"#9B268F",S4:"#E30613",S5:"#1c3f94",S6:"#00975F",S7:"#943126",S8:"#5A5A5A",S20:"#ED6B22"
-};
-function farbe(label, type){
+const LINIEN={U1:"#438136",U2:"#C20831",U3:"#EC6726",U4:"#00A984",U5:"#BC7A00",U6:"#0065B1",U7:"#C20831",U8:"#EC6726",
+              S1:"#16BAE7",S2:"#76B82A",S3:"#9B268F",S4:"#E30613",S5:"#1c3f94",S6:"#00975F",S7:"#943126",S8:"#5A5A5A",S20:"#ED6B22"};
+function farbe(label,type){
   const l=(label||"").toUpperCase();
   if(LINIEN[l]) return LINIEN[l];
   if(type==="SBAHN"||l.startsWith("S")) return "#00903a";
   if(type==="UBAHN"||l.startsWith("U")) return "#0065B1";
   if(type==="TRAM") return "#d11e2a";
-  return "#005CA8";   // Bus + Nachtbus → Blau
+  return "#005CA8";
 }
 
-function statusFarbe(m, threshold){
-  if(m<=1)         return "var(--rot)";
-  if(m<=threshold) return "var(--gelb)";
-  return "var(--gruen)";
-}
-
-function minuten(dep){ return Math.round(((dep.realtimeDepartureTime||dep.plannedDepartureTime)-Date.now())/60000); }
-
-function matcht(dep,weg){
-  const label=(dep.label||"").toUpperCase();
-  const ziel=(dep.destination||"").toLowerCase();
-  if(weg.filterLine){
-    const f=weg.filterLine.toUpperCase().trim();
-    if(!label.startsWith(f)) return false;
-  }
+function matcht(d,weg){
+  const label=(d.label||"").toUpperCase(),ziel=(d.destination||"").toLowerCase();
+  if(weg.filterLine&&!label.startsWith(weg.filterLine.toUpperCase())) return false;
   if(weg.filterZiel&&!ziel.includes(weg.filterZiel.toLowerCase())) return false;
   return true;
 }
 
-function zeitHtml(m, threshold){
-  const col = statusFarbe(m, threshold);
-  const urgent = m<=1 ? "urgent" : "";
-  if(m<=0) return `<span class="tcell"><span class="tnum" style="color:var(--rot)">jetzt</span><span class="tdot ${urgent}" style="background:${col}"></span></span>`;
-  return `<span class="tcell"><span class="tnum">${m}</span><span class="tunit">min</span><span class="tdot ${urgent}" style="background:${col}"></span></span>`;
+/* ── Zeile erstellen ── */
+function createRowEl(d, weg){
+  const m=minuten(d), col=statusFarbe(m,weg.threshold);
+  const el=document.createElement("div"); el.className="row";
+  el.innerHTML=`
+    <span class="badge" style="background:${farbe(d.label,d.transportType)}">${d.label||"?"}</span>
+    <span class="dest">${d.destination||""}</span>
+    <span class="plat">${d.platform?`Gl.${d.platform}`:""}</span>
+    <span class="tcell">
+      <span class="tnum" style="${m<=0?'color:var(--rot)':''}">${m<=0?"jetzt":m}</span>
+      <span class="tunit">${m<=0?"":"min"}</span>
+      <span class="tdot ${m<=1?'urgent':''}" style="background:${col}"></span>
+    </span>`;
+  return el;
+}
+
+/* ── Zeile in-place aktualisieren (nur Minuten + Dot) ── */
+function updateRowEl(el, d, weg){
+  const m=minuten(d), col=statusFarbe(m,weg.threshold);
+  const tnum=el.querySelector(".tnum"), tunit=el.querySelector(".tunit"), tdot=el.querySelector(".tdot");
+  if(tnum){ tnum.textContent=m<=0?"jetzt":String(m); tnum.style.color=m<=0?"var(--rot)":""; }
+  if(tunit) tunit.textContent=m<=0?"":"min";
+  if(tdot){ tdot.className=`tdot ${m<=1?"urgent":""}`; tdot.style.background=col; }
+}
+
+/* ── Station aktualisieren: echter DOM-Diff ── */
+function updateStation(weg){
+  /* Karte erstellen wenn noch nicht vorhanden */
+  if(!state[weg.id]){
+    const cardEl=document.createElement("div"); cardEl.className="card";
+    cardEl.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="thresh">~${weg.threshold+1} min</span></div>`;
+    state[weg.id]={ cardEl, rows:new Map() };
+    document.getElementById("board").appendChild(cardEl);
+  }
+  const { cardEl, rows }=state[weg.id];
+
+  /* Lade-/Fehlerstatus */
+  let statusEl=cardEl.querySelector(".card-status");
+  const raw=depCache[weg.id];
+  if(!raw){
+    if(!statusEl){ statusEl=document.createElement("div"); statusEl.className="card-status"; cardEl.appendChild(statusEl); }
+    statusEl.className=`card-status ${errCache[weg.id]?"err":""}`;
+    statusEl.textContent=errCache[weg.id]?`⚠️ ${errCache[weg.id]} – Retry…`:"Lade…";
+    return;
+  }
+  if(statusEl) statusEl.remove();
+
+  /* Aktuelle Abfahrten berechnen */
+  let deps=raw.filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=0);
+  deps.sort((a,b)=>minuten(a)-minuten(b));
+  deps=deps.slice(0,PRO_WEG);
+  const newKeySet=new Set(deps.map(getKey));
+
+  /* Abgefahrene Zeilen sanft entfernen */
+  for(const [key,rowEl] of rows){
+    if(!newKeySet.has(key)){
+      const h=rowEl.offsetHeight;
+      rowEl.style.maxHeight=h+"px";
+      rowEl.getBoundingClientRect(); // reflow
+      rowEl.style.maxHeight="0";
+      rowEl.style.opacity="0";
+      rowEl.style.transform="translateY(-5px)";
+      rowEl.style.paddingTop="0";
+      rowEl.style.paddingBottom="0";
+      setTimeout(()=>rowEl.remove(),300);
+      rows.delete(key);
+    }
+  }
+
+  /* Bestehende Zeilen aktualisieren */
+  for(const d of deps){
+    const key=getKey(d);
+    if(rows.has(key)) updateRowEl(rows.get(key),d,weg);
+  }
+
+  /* Neue Zeilen einblenden */
+  for(const d of deps){
+    const key=getKey(d);
+    if(!rows.has(key)){
+      const rowEl=createRowEl(d,weg);
+      rowEl.style.opacity="0";
+      rowEl.style.transform="translateY(8px)";
+      cardEl.appendChild(rowEl);
+      rowEl.getBoundingClientRect(); // reflow
+      rowEl.style.opacity="1";
+      rowEl.style.transform="translateY(0)";
+      rows.set(key,rowEl);
+    }
+  }
+}
+
+/* ── API ── */
+async function holen(url){
+  let e;
+  for(const p of PROXIES){
+    try{ const r=await fetch(p?p+encodeURIComponent(url):url); if(!r.ok) throw new Error("HTTP "+r.status); return await r.json(); }catch(err){e=err;}
+  }
+  throw e||new Error("Kein Zugriff");
 }
 
 async function fetchStation(weg){
   try{
-    depCache[weg.id] = await holen(`${API}/departures?globalId=${weg.id}&limit=40`);
-    errCache[weg.id] = null;
-    clearTimeout(retryTmr[weg.id]);
+    depCache[weg.id]=await holen(`${API}/departures?globalId=${weg.id}&limit=40`);
+    errCache[weg.id]=null; clearTimeout(retryTmr[weg.id]);
   }catch(e){
-    errCache[weg.id] = e.message||"Fehler";
-    clearTimeout(retryTmr[weg.id]);
-    retryTmr[weg.id] = setTimeout(()=>fetchStation(weg), RETRY_MS);
+    errCache[weg.id]=e.message||"Fehler"; clearTimeout(retryTmr[weg.id]);
+    retryTmr[weg.id]=setTimeout(()=>fetchStation(weg),RETRY_MS);
   }
 }
 async function fetchAll(){ await Promise.all(WEGE.map(fetchStation)); }
 
-function renderWeg(weg){
-  const el=document.createElement("div");el.className="card";
-  el.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="thresh">~${weg.threshold+1} min</span></div>`;
-  const raw=depCache[weg.id];
-  if(!raw){
-    el.innerHTML+=errCache[weg.id]
-      ?`<div class="err">⚠️ ${errCache[weg.id]} – Retry…</div>`
-      :`<div class="loading">Lade…</div>`;
-    return el;
-  }
-  let deps=raw.filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=0);
-  deps.sort((a,b)=>minuten(a)-minuten(b));
-  deps=deps.slice(0,PRO_WEG);
-  if(deps.length===0){ el.innerHTML+=`<div class="empty">Keine Abfahrten</div>`; return el; }
-  deps.forEach((d,i)=>{
-    const m=minuten(d);
-    const plat=d.platform?`<span class="plat">Gl.${d.platform}</span>`:`<span class="plat"></span>`;
-    el.innerHTML+=`<div class="row" style="animation:rowIn .3s ease ${i*0.06}s both">
-      <span class="badge" style="background:${farbe(d.label,d.transportType)}">${d.label||"?"}</span>
-      <span class="dest">${d.destination||""}</span>
-      ${plat}
-      ${zeitHtml(m,weg.threshold)}
-    </div>`;
-  });
-  return el;
+/* ── Wetter ── */
+async function fetchWeather(){
+  try{
+    const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1170&longitude=11.5720&current=temperature_2m,weather_code&timezone=Europe%2FBerlin");
+    const d=await r.json();
+    const temp=Math.round(d.current.temperature_2m), code=d.current.weather_code;
+    const icons=[[0,"☀️"],[3,"⛅"],[48,"🌫️"],[67,"🌧️"],[77,"❄️"],[82,"🌦️"],[99,"⛈️"]];
+    const icon=(icons.find(([c])=>code<=c)||["",""])[1];
+    document.getElementById("weather").textContent=`${icon} ${temp}°`;
+  }catch(e){}
 }
 
+/* ── Render & Takt ── */
 function renderAll(){
-  document.getElementById("board").replaceChildren(...WEGE.map(renderWeg));
+  WEGE.forEach(updateStation);
   document.getElementById("updated").textContent=
     "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
 }
-
 function clock(){ document.getElementById("clock").textContent=new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}); }
 
 clock(); setInterval(clock,10000);
+fetchWeather(); setInterval(fetchWeather,600000);
+
+/* Initial: Karten anlegen (leer), dann Daten laden */
+renderAll();
 fetchAll().then(renderAll);
 setInterval(renderAll, RENDER_INT);
 setInterval(()=>fetchAll().then(renderAll), FETCH_INT);
