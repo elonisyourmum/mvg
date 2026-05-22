@@ -190,15 +190,25 @@ function updateStation(weg){
     }
   }
   // ═══ FLIP-Animation: korrekte Sortierung + smoothe Übergänge ═══
-  // FIRST: aktuelle Positionen aller bestehenden Zeilen merken
+  // Vorab-Check ohne Layout-Reads: brauchen wir überhaupt FLIP?
+  let depHappened=false;
+  for(const[k]of rows)if(!newKeySet.has(k)){depHappened=true;break;}
+  let hasNew=false;
+  for(const k of sortedKeys)if(!rows.has(k)){hasNew=true;break;}
+  let domChanged=depHappened||hasNew;
+  if(!domChanged){ // DOM-Reihenfolge prüfen (kein offsetTop!)
+    let prev=cardEl.querySelector(".station");
+    for(const k of sortedKeys){const el=rows.get(k);if(!el)continue;
+      if(el.previousElementSibling!==prev){domChanged=true;break;}prev=el;}
+  }
+  // FIRST: Positionen nur lesen wenn nötig (verhindert Layout-Interrupts bei stabilem Render)
   const firstTop=new Map();
-  for(const[k,el]of rows)firstTop.set(k,el.offsetTop);
+  if(domChanged)for(const[k,el]of rows)firstTop.set(k,el.offsetTop);
 
   // Abfahrende Zeilen: aus dem Fluss nehmen (absolute) + ausblenden
-  // → so verschieben sie die Sortierung der anderen nicht
   for(const[key,rowEl]of rows){
     if(!newKeySet.has(key)){
-      rows.delete(key);
+      depHappened=true;rows.delete(key);
       const top=rowEl.offsetTop;
       rowEl.style.position="absolute";rowEl.style.top=top+"px";
       rowEl.style.left="0";rowEl.style.right="0";rowEl.style.pointerEvents="none";
@@ -224,16 +234,25 @@ function updateStation(weg){
   let prev=headerEl;
   for(const d of deps){const el=rows.get(getKey(d));if(el){prev.after(el);prev=el;}}
 
-  // LAST + INVERT + PLAY: Positionswechsel smooth animieren
-  requestAnimationFrame(()=>{
+  // LAST + INVERT + PLAY: nur animieren wenn sich wirklich etwas verändert hat
+  // → verhindert unnötige Layout-Reads die Blink/Marquee-Animationen stören
+  if(newRows.size>0){
+    requestAnimationFrame(()=>{
+      for(const[k,el]of rows){
+        if(newRows.has(el)){el.style.transition=`opacity ${FADE}ms ease`;el.style.opacity="1";}
+      }
+    });
+  }
+  // FLIP nur wenn departing rows da waren ODER DOM-Reihenfolge geändert wurde
+  const needsFlip=domChanged;
+  if(needsFlip) requestAnimationFrame(()=>{
     for(const[k,el]of rows){
-      if(newRows.has(el)){ // neue Zeile: einblenden
-        el.style.transition=`opacity ${FADE}ms ease`;el.style.opacity="1";continue;}
+      if(newRows.has(el))continue; // schon oben behandelt
       if(!firstTop.has(k))continue;
       const delta=firstTop.get(k)-el.offsetTop;
       if(Math.abs(delta)>0.5){
         el.style.transition="none";el.style.transform=`translateY(${delta}px)`;
-        el.getBoundingClientRect(); // reflow erzwingen
+        el.getBoundingClientRect();
         requestAnimationFrame(()=>{
           el.style.transition=`transform ${COLLAPSE}ms ease`;el.style.transform="";
           setTimeout(()=>{el.style.transition="";},COLLAPSE+30);
@@ -295,7 +314,7 @@ function renderAll(){
   const board=document.getElementById("board");
   let ts=document.getElementById("updated");
   if(!ts){ts=document.createElement("div");ts.id="updated";ts.className="updated";}
-  board.appendChild(ts);
+  if(board.lastChild!==ts)board.appendChild(ts);
   const stale=Date.now()-lastFetchOk>STALE_MS;
   const minAlt=Math.round((Date.now()-lastFetchOk)/60000);
   ts.classList.toggle("stale",stale);
