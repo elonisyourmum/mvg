@@ -44,9 +44,8 @@
   .row{
     display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:.65rem;
     padding:.46vmin 0;overflow:hidden;
-    transition:max-height .28s ease, opacity .22s ease, transform .22s ease, padding .28s ease;
   }
-  .row + .row{border-top:1px solid var(--line);}
+  .row:not(:last-child){border-bottom:1px solid var(--line);}
 
   .badge{color:#fff;border-radius:6px;font-weight:700;
          padding:.13em .44em;min-width:2.3em;text-align:center;
@@ -137,7 +136,7 @@ function createRowEl(d, weg){
     <span class="tcell">
       <span class="tnum" style="${m<=0?'color:var(--rot)':''}">${m<=0?"jetzt":m}</span>
       <span class="tunit">${m<=0?"":"min"}</span>
-      <span class="tdot ${m<=1?'urgent':''}" style="background:${col}"></span>
+      <span class="tdot ${m<=1?'urgent':''}" style="background:${col}${m<=1?`;animation-delay:${-(Date.now()%1800)}ms`:''}"></span>
     </span>`;
   return el;
 }
@@ -148,7 +147,12 @@ function updateRowEl(el, d, weg){
   const tnum=el.querySelector(".tnum"), tunit=el.querySelector(".tunit"), tdot=el.querySelector(".tdot");
   if(tnum){ tnum.textContent=m<=0?"jetzt":String(m); tnum.style.color=m<=0?"var(--rot)":""; }
   if(tunit) tunit.textContent=m<=0?"":"min";
-  if(tdot){ tdot.className=`tdot ${m<=1?"urgent":""}`; tdot.style.background=col; }
+  if(tdot){
+    tdot.style.background=col;
+    const urgent=m<=1, wasUrgent=tdot.classList.contains("urgent");
+    if(urgent&&!wasUrgent){ tdot.style.animationDelay=`${-(Date.now()%1800)}ms`; tdot.classList.add("urgent"); }
+    else if(!urgent&&wasUrgent){ tdot.classList.remove("urgent"); tdot.style.animationDelay=""; }
+  }
 }
 
 /* ── Station aktualisieren: echter DOM-Diff ── */
@@ -179,40 +183,53 @@ function updateStation(weg){
   deps=deps.slice(0,PRO_WEG);
   const newKeySet=new Set(deps.map(getKey));
 
-  /* Abgefahrene Zeilen sanft entfernen */
+  /* Phasen-Timing */
+  const FADE=380, COLLAPSE=460;  // ms
+
+  /* Abgefahrene Zeilen gestaffelt entfernen:
+     Phase 1 verblassen (Höhe bleibt) → Phase 2 kollabieren (alles rutscht hoch) */
+  let hadDeparture=false;
   for(const [key,rowEl] of rows){
     if(!newKeySet.has(key)){
-      const h=rowEl.offsetHeight;
-      rowEl.style.maxHeight=h+"px";
-      rowEl.getBoundingClientRect(); // reflow
-      rowEl.style.maxHeight="0";
-      rowEl.style.opacity="0";
-      rowEl.style.transform="translateY(-5px)";
-      rowEl.style.paddingTop="0";
-      rowEl.style.paddingBottom="0";
-      setTimeout(()=>rowEl.remove(),300);
+      hadDeparture=true;
       rows.delete(key);
+      // Phase 1: nur Opacity, Position bleibt
+      rowEl.style.transition=`opacity ${FADE}ms ease`;
+      rowEl.style.opacity="0";
+      // Phase 2: nach dem Verblassen Höhe kollabieren → smoothes Hochrutschen
+      setTimeout(()=>{
+        const h=rowEl.offsetHeight;
+        rowEl.style.maxHeight=h+"px";
+        rowEl.getBoundingClientRect();
+        rowEl.style.transition=`max-height ${COLLAPSE}ms ease, padding ${COLLAPSE}ms ease, border-width ${COLLAPSE}ms ease`;
+        rowEl.style.maxHeight="0";
+        rowEl.style.paddingTop="0";
+        rowEl.style.paddingBottom="0";
+        rowEl.style.borderWidth="0";
+      }, FADE);
+      setTimeout(()=>rowEl.remove(), FADE+COLLAPSE+40);
     }
   }
 
-  /* Bestehende Zeilen aktualisieren */
+  /* Bestehende Zeilen in-place aktualisieren */
   for(const d of deps){
     const key=getKey(d);
     if(rows.has(key)) updateRowEl(rows.get(key),d,weg);
   }
 
-  /* Neue Zeilen einblenden */
+  /* Neue Zeilen: erst NACH Verblassen+Kollabieren unten einblenden */
+  const enterDelay = hadDeparture ? FADE+COLLAPSE : 60;
   for(const d of deps){
     const key=getKey(d);
     if(!rows.has(key)){
       const rowEl=createRowEl(d,weg);
       rowEl.style.opacity="0";
-      rowEl.style.transform="translateY(8px)";
       cardEl.appendChild(rowEl);
-      rowEl.getBoundingClientRect(); // reflow
-      rowEl.style.opacity="1";
-      rowEl.style.transform="translateY(0)";
       rows.set(key,rowEl);
+      setTimeout(()=>{
+        rowEl.style.transition="opacity 380ms ease";
+        rowEl.style.opacity="1";
+      }, enterDelay);
     }
   }
 }
