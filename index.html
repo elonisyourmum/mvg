@@ -112,6 +112,7 @@ const STALE_MS=120000; // 2 min ohne erfolgreichen Fetch = veraltet
 const STOERUNG_INT=300000; // Störungen alle 5 min abrufen
 let stoerungenByLine={}; // { 'U2': 'Titel', ... }
 let minHeightSet=false;
+let isFetching=false; // Guard gegen gleichzeitige Fetch-Aufrufe (z.B. nach Screen-Wakeup)
 
 /* ══ Helpers ════════════════════════════════════════════════════════ */
 function getKey(d){return`${d.label}|${d.destination}|${d.plannedDepartureTime}`;}
@@ -280,10 +281,20 @@ async function fetchStop(id){
             retryTmr[id]=setTimeout(()=>fetchStop(id),RETRY_MS);}}
 
 async function fetchAll(){
+  if(isFetching) return; // Abbrechen, falls bereits ein Abruf läuft
+  isFetching = true;
+
   const rl=document.getElementById("reload");
   if(rl)rl.classList.add("spinning");
-  await Promise.all(WEGE.map(w=>fetchStop(w.id)));
-  if(rl)rl.classList.remove("spinning");
+  
+  try {
+    await Promise.all(WEGE.map(w=>fetchStop(w.id)));
+  } catch(e) {
+    /* Fehler werden bereits pro Stop in fetchStop abgefangen */
+  } finally {
+    if(rl)rl.classList.remove("spinning");
+    isFetching = false; // Schild wieder freigeben
+  }
 }
 
 async function fetchMessages(){
