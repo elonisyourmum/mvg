@@ -6,23 +6,20 @@
 <title>MVV Abfahrten</title>
 <style>
   :root{
-    --bg:#0e1116; --card:#171b22; --line:#242a33;
-    --ink:#f4f6f8; --muted:#8b95a1; --mgv:#0065B1;
-    --gruen:#5ba368; --gelb:#c49a2e; --rot:#e85d4a;
+    --bg:#0e1116;--card:#171b22;--line:#242a33;
+    --ink:#f4f6f8;--muted:#8b95a1;--mgv:#0065B1;
+    --gruen:#5ba368;--gelb:#c49a2e;--rot:#e85d4a;
+    --nav-h:52px;
     --sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI","Helvetica Neue",Arial,sans-serif;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{
-    font-family:var(--sys);background:var(--bg);color:var(--ink);
-    padding:1.9vmin 2.5vmin 2.1vmin;overflow-y:auto;min-height:100vh;user-select:none;
-    -webkit-font-smoothing:antialiased;
-  }
-  .topbar{
-    display:flex;align-items:center;gap:1.1vmin;
-    padding-bottom:1.2vmin;margin-bottom:1.5vmin;
-    border-bottom:1px solid var(--line);
-    position:sticky;top:0;background:var(--bg);z-index:5;
-  }
+  body{font-family:var(--sys);background:var(--bg);color:var(--ink);overflow-y:auto;
+       min-height:100vh;user-select:none;-webkit-font-smoothing:antialiased;
+       padding-bottom:calc(var(--nav-h) + 8px);}
+
+  .topbar{display:flex;align-items:center;gap:1.1vmin;
+          padding:1.6vmin 2.5vmin 1.2vmin;border-bottom:1px solid var(--line);
+          position:sticky;top:0;background:var(--bg);z-index:10;}
   .logo{background:var(--mgv);color:#fff;font-weight:700;
         font-size:clamp(.82rem,2.8vmin,1.08rem);letter-spacing:.02em;
         padding:.3em .48em;border-radius:7px;line-height:1;}
@@ -31,33 +28,25 @@
   #weather{font-size:clamp(.74rem,2.3vmin,.95rem);color:var(--muted);white-space:nowrap;}
   .clock{color:var(--muted);font-size:clamp(.86rem,2.8vmin,1.06rem);font-weight:500;font-variant-numeric:tabular-nums;}
 
-  .board{display:flex;flex-direction:column;gap:1.1vmin;}
+  .view{display:none;padding:1.5vmin 2.5vmin .5vmin;}
+  .view.active{display:block;}
 
-  /* Karte: display:flex damit CSS order funktioniert */
-  .card{
-    background:var(--card);border:1px solid var(--line);border-radius:13px;
-    padding:1.1vmin 1.5vmin .55vmin;
-    display:flex;flex-direction:column;
-  }
-  .station{display:flex;align-items:baseline;gap:.4em;margin-bottom:.55vmin;flex-shrink:0;}
+  /* ── Abfahrten ── */
+  .board{display:flex;flex-direction:column;gap:1.1vmin;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;
+        padding:1.1vmin 1.5vmin .55vmin;overflow:hidden;}
+  .station{display:flex;align-items:baseline;gap:.4em;margin-bottom:.55vmin;}
   .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);}
   .thresh{font-size:.65em;color:var(--muted);font-weight:400;}
-
-  /* Feste Zeilen: transition nur auf opacity und transform */
-  .row{
-    display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:.65rem;
-    padding:.46vmin 0;
-    transition:opacity 500ms ease, transform 500ms ease;
-  }
+  .row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:.65rem;
+       padding:.46vmin 0;overflow:hidden;
+       transition:opacity 500ms ease,max-height 600ms ease,padding 600ms ease,border-width 600ms ease;}
   .row:not(:last-child){border-bottom:1px solid var(--line);}
-
-  .badge{color:#fff;border-radius:6px;font-weight:700;
-         padding:.13em .44em;min-width:2.3em;text-align:center;
-         font-size:clamp(.75rem,2.4vmin,.98rem);}
+  .badge{color:#fff;border-radius:6px;font-weight:700;padding:.13em .44em;min-width:2.3em;
+         text-align:center;font-size:clamp(.75rem,2.4vmin,.98rem);}
   .dest{font-size:clamp(.84rem,2.7vmin,1.07rem);font-weight:400;color:#d6dbe1;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .plat{font-size:.7em;color:var(--muted);font-weight:500;text-align:right;
-        white-space:nowrap;min-width:2.8em;}
+  .plat{font-size:.7em;color:var(--muted);font-weight:500;text-align:right;white-space:nowrap;min-width:2.8em;}
   .tcell{display:flex;align-items:center;justify-content:flex-end;gap:.3em;min-width:4.4em;}
   .tnum{font-size:clamp(.94rem,3vmin,1.18rem);font-weight:700;color:var(--ink);
         font-variant-numeric:tabular-nums;line-height:1;}
@@ -65,217 +54,315 @@
   .tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.15;transform:scale(.6);}}
   .tdot.urgent{animation:pulse 1.8s ease-in-out infinite;}
-
   .card-msg{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
   .card-msg.err{color:var(--rot);}
+
+  /* ── Routen ── */
+  .rboard{display:flex;flex-direction:column;gap:1.2vmin;}
+  .rcard{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:1.1vmin 1.5vmin .7vmin;}
+  .rhead{margin-bottom:.7vmin;}
+  .rname{font-weight:600;font-size:clamp(.9rem,2.8vmin,1.12rem);}
+  .rvia{display:block;font-size:.7em;color:var(--muted);margin-top:.15em;}
+  .rrow{display:flex;align-items:center;gap:.55rem;padding:.44vmin 0;flex-wrap:nowrap;}
+  .rrow:not(:last-child){border-bottom:1px solid var(--line);}
+  .rbadge{color:#fff;border-radius:5px;font-weight:700;padding:.1em .38em;
+          font-size:clamp(.7rem,2.1vmin,.88rem);white-space:nowrap;flex-shrink:0;}
+  .rmin{font-size:clamp(.88rem,2.7vmin,1.08rem);font-weight:700;font-variant-numeric:tabular-nums;}
+  .rhint{font-size:.7em;color:var(--muted);font-weight:400;margin-left:.2em;}
+  .rarrow{color:var(--muted);font-size:.8em;flex-shrink:0;}
+  .rconn{display:flex;align-items:center;gap:.4em;margin-left:auto;white-space:nowrap;}
+  .rtime{font-size:clamp(.78rem,2.3vmin,.95rem);color:var(--muted);font-variant-numeric:tabular-nums;}
+  .rempty{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.4vmin 0;}
+  .rmiss{color:var(--rot);font-size:.7em;margin-left:.3em;}
+
+  /* ── Bottom Nav ── */
+  .bottomnav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);
+             background:var(--card);border-top:1px solid var(--line);display:flex;z-index:20;}
+  .navbtn{flex:1;background:none;border:none;color:var(--muted);font-family:var(--sys);
+          font-size:clamp(.78rem,2.6vmin,1rem);font-weight:600;cursor:pointer;transition:color .2s;}
+  .navbtn.active{color:var(--mgv);}
+  .navbtn.active::after{content:'';display:block;height:2px;background:var(--mgv);
+                        border-radius:1px;margin:2px auto 0;width:30%;}
   .updated{text-align:center;color:var(--muted);font-size:.74rem;margin-top:.9vmin;
-           font-variant-numeric:tabular-nums;opacity:.6;}
+           font-variant-numeric:tabular-nums;opacity:.6;padding:0 2.5vmin;}
 </style>
 </head>
 <body>
   <div class="topbar">
     <span class="logo">MVV</span>
-    <h1>Abfahrten</h1>
+    <h1 id="viewTitle">Abfahrten</h1>
     <div class="tbar-right">
       <span id="weather"></span>
       <span class="clock" id="clock">--:--</span>
     </div>
   </div>
-  <div class="board" id="board"></div>
+  <div id="viewAbfahrten" class="view active">
+    <div class="board" id="board"></div>
+  </div>
+  <div id="viewRouten" class="view">
+    <div class="rboard" id="routenPanel"></div>
+  </div>
   <div class="updated" id="updated"></div>
+  <div class="bottomnav">
+    <button class="navbtn active" id="btnAbfahrten" onclick="setView('abfahrten')">Abfahrten</button>
+    <button class="navbtn" id="btnRouten" onclick="setView('routen')">Routen</button>
+  </div>
 
 <script>
-const WEGE = [
-  { person:"Silberhornstraße",  id:"de:09162:1170", threshold:9,  filterLine:"U", filterZiel:"" },
-  { person:"Ostfriedhof",       id:"de:09162:1105", threshold:3,  filterLine:"",  filterZiel:"" },
-  { person:"St.-Martin-Straße", id:"de:09162:1100", threshold:14, filterLine:"",  filterZiel:"" },
-  { person:"Kolumbusplatz",     id:"de:09162:160",  threshold:11, filterLine:"U", filterZiel:"" },
+/* ══ Konfiguration ══════════════════════════════════════════════════ */
+const WEGE=[
+  {person:"Silberhornstraße", id:"de:09162:1170",threshold:9, filterLine:"U",filterZiel:""},
+  {person:"Ostfriedhof",      id:"de:09162:1105",threshold:3, filterLine:"", filterZiel:""},
+  {person:"St.-Martin-Straße",id:"de:09162:1100",threshold:14,filterLine:"", filterZiel:""},
+  {person:"Kolumbusplatz",    id:"de:09162:160", threshold:11,filterLine:"U",filterZiel:""},
 ];
-const PRO_WEG=6, FETCH_INT=30000, RENDER_INT=10000, RETRY_MS=10000;
-const FADE=500; // ms für Crossfade
+
+/* Umstiegsbahnhöfe – nur für Routen-Panel, nicht auf der Haupttafel */
+const ROUTE_STOP_IDS=["de:09162:50","de:09162:100","de:09162:920"];
+
+/* Route-Definitionen
+   a1 = erster Abschnitt (ab Silberhornstraße)
+   transfer = Umstiegsinfo (Fahrzeit in min, Mindest-Umstiegszeit)
+   a2 = zweiter Abschnitt (Anschlussverbindung), null = nur Ankuft zeigen */
+const ROUTEN=[
+  { name:"Hochschule München", via:"Hbf → Fußweg ~5 min",
+    a1:{linie:"U2",ziel:"Feldmoching",fußweg:3},
+    transfer:{id:"de:09162:100",fahrzeit:6,umstieg:4,label:"Hbf"},
+    a2:null },
+  { name:"Garching", via:"Sendlinger Tor → U6",
+    a1:{linie:"U2",ziel:"Feldmoching",fußweg:3},
+    transfer:{id:"de:09162:50",fahrzeit:4,umstieg:3,label:"Sdlg. Tor"},
+    a2:{linie:"U6",ziel:"Garching"} },
+  { name:"Haar", via:"Trudering → S2 Richtung Erding",
+    a1:{linie:"U2",ziel:"Messestadt",fußweg:3},
+    transfer:{id:"de:09162:920",fahrzeit:10,umstieg:3,label:"Trudering"},
+    a2:{linie:"S2",ziel:"Erding"} },
+  { name:"Karlsfeld", via:"Hbf → S2 Richtung Petershausen",
+    a1:{linie:"U2",ziel:"Feldmoching",fußweg:3},
+    transfer:{id:"de:09162:100",fahrzeit:6,umstieg:4,label:"Hbf"},
+    a2:{linie:"S2",ziel:"Petershausen"} },
+];
+
+const PRO_WEG=6,FETCH_INT=30000,RENDER_INT=10000,RETRY_MS=10000;
+const FADE=500,COLLAPSE=600;
 const API="https://www.mvg.de/api/bgw-pt/v3";
 const PROXIES=[""];
-const depCache={}, errCache={}, retryTmr={};
+const depCache={},errCache={},retryTmr={};
+let currentView="abfahrten",minHeightSet=false;
 
-/* ── Pro Station: feste Slots, nie hinzugefügt/entfernt ── */
-const stSlots={}; // id → { cardEl, rowEls:[], slotKeys:[], keyToSlot:{} }
+/* ══ Helpers ════════════════════════════════════════════════════════ */
+function getKey(d){return`${d.label}|${d.destination}|${d.plannedDepartureTime}`;}
+function minuten(d){return Math.round(((d.realtimeDepartureTime||d.plannedDepartureTime)-Date.now())/60000);}
+function statusFarbe(m,t){return m<=1?"var(--rot)":m<=t?"var(--gelb)":"var(--gruen)";}
+function routeFarbe(m,fw){const r=m-fw;return r<=1?"var(--rot)":r<=3?"var(--gelb)":"var(--gruen)";}
+function uhrzeitStr(d){return new Date(d.realtimeDepartureTime||d.plannedDepartureTime)
+  .toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});}
 
-function initSlots(weg){
-  const cardEl=document.createElement("div"); cardEl.className="card";
-  cardEl.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="thresh">~${weg.threshold+1} min</span></div>`;
-  const rowEls=[], slotKeys=new Array(PRO_WEG).fill(null), keyToSlot={};
-  for(let i=0;i<PRO_WEG;i++){
-    const el=document.createElement("div"); el.className="row";
-    el.style.opacity="0"; el.style.visibility="hidden"; el.style.order=i;
-    cardEl.appendChild(el); rowEls.push(el);
-  }
-  stSlots[weg.id]={cardEl,rowEls,slotKeys,keyToSlot};
-  document.getElementById("board").appendChild(cardEl);
-}
-
-/* ── Zeile befüllen / aktualisieren ── */
-const LINIEN={U1:"#438136",U2:"#C20831",U3:"#EC6726",U4:"#00A984",U5:"#BC7A00",U6:"#0065B1",U7:"#C20831",U8:"#EC6726",
-              S1:"#16BAE7",S2:"#76B82A",S3:"#9B268F",S4:"#E30613",S5:"#1c3f94",S6:"#00975F",S7:"#943126",S8:"#5A5A5A",S20:"#ED6B22"};
-function farbe(label,type){ const l=(label||"").toUpperCase();
-  if(LINIEN[l]) return LINIEN[l];
-  if(type==="SBAHN"||l.startsWith("S")) return "#00903a";
-  if(type==="UBAHN"||l.startsWith("U")) return "#0065B1";
-  if(type==="TRAM") return "#d11e2a"; return "#005CA8"; }
-function statusFarbe(m,t){ return m<=1?"var(--rot)":m<=t?"var(--gelb)":"var(--gruen)"; }
-function minuten(d){ return Math.round(((d.realtimeDepartureTime||d.plannedDepartureTime)-Date.now())/60000); }
-function getKey(d){ return `${d.label}|${d.destination}|${d.plannedDepartureTime}`; }
+const LINIEN={U1:"#438136",U2:"#C20831",U3:"#EC6726",U4:"#00A984",U5:"#BC7A00",U6:"#0065B1",
+              U7:"#C20831",U8:"#EC6726",S1:"#16BAE7",S2:"#76B82A",S3:"#9B268F",S4:"#E30613",
+              S5:"#1c3f94",S6:"#00975F",S7:"#943126",S8:"#5A5A5A",S20:"#ED6B22"};
+function farbe(label,type){const l=(label||"").toUpperCase();
+  if(LINIEN[l])return LINIEN[l];
+  if(type==="SBAHN"||l.startsWith("S"))return"#00903a";
+  if(type==="UBAHN"||l.startsWith("U"))return"#0065B1";
+  if(type==="TRAM")return"#d11e2a";return"#005CA8";}
 function matcht(d,weg){
-  const l=(d.label||"").toUpperCase(), z=(d.destination||"").toLowerCase();
-  if(weg.filterLine&&!l.startsWith(weg.filterLine.toUpperCase())) return false;
-  if(weg.filterZiel&&!z.includes(weg.filterZiel.toLowerCase())) return false; return true; }
+  const l=(d.label||"").toUpperCase(),z=(d.destination||"").toLowerCase();
+  if(weg.filterLine&&!l.startsWith(weg.filterLine.toUpperCase()))return false;
+  if(weg.filterZiel&&!z.includes(weg.filterZiel.toLowerCase()))return false;return true;}
 
-function fillSlot(el,d,weg){
-  const m=minuten(d), col=statusFarbe(m,weg.threshold);
-  const del=`${m<=1?`;animation-delay:${-(Date.now()%1800)}ms`:''}`;
+/* ══ Abfahrten-Board ════════════════════════════════════════════════ */
+const state={};
+
+function fillRowEl(el,d,weg){
+  const m=minuten(d),col=statusFarbe(m,weg.threshold);
+  const del=m<=1?`;animation-delay:${-(Date.now()%1800)}ms`:"";
   el.innerHTML=`
     <span class="badge" style="background:${farbe(d.label,d.transportType)}">${d.label||"?"}</span>
     <span class="dest">${d.destination||""}</span>
     <span class="plat">${d.platform?`Gl.${d.platform}`:""}</span>
     <span class="tcell">
-      <span class="tnum" style="${m<=0?'color:var(--rot)':''}">${m<=0?"jetzt":m}</span>
+      <span class="tnum" style="${m<=0?"color:var(--rot)":""}">${m<=0?"jetzt":m}</span>
       <span class="tunit">${m<=0?"":"min"}</span>
-      <span class="tdot ${m<=1?'urgent':''}" style="background:${col}${del}"></span>
-    </span>`;
-}
-function updateSlot(el,d,weg){
-  const m=minuten(d), col=statusFarbe(m,weg.threshold);
-  const tnum=el.querySelector(".tnum"), tunit=el.querySelector(".tunit"), tdot=el.querySelector(".tdot");
-  if(tnum){tnum.textContent=m<=0?"jetzt":String(m); tnum.style.color=m<=0?"var(--rot)":"";}
-  if(tunit) tunit.textContent=m<=0?"":"min";
-  if(tdot){
-    tdot.style.background=col;
-    const urg=m<=1, was=tdot.classList.contains("urgent");
-    if(urg&&!was){tdot.style.animationDelay=`${-(Date.now()%1800)}ms`; tdot.classList.add("urgent");}
-    else if(!urg&&was){tdot.classList.remove("urgent"); tdot.style.animationDelay="";}
-  }
-}
+      <span class="tdot ${m<=1?"urgent":""}" style="background:${col}${del}"></span>
+    </span>`;}
 
-/* ── Crossfade: Slot ausblenden → Inhalt wechseln → einblenden ── */
-function crossfade(el, fillFn, delay=0){
-  setTimeout(()=>{
-    el.style.opacity="0";
-    el.style.visibility="visible";
-    setTimeout(()=>{
-      fillFn(el);
-      el.getBoundingClientRect();
-      el.style.opacity="1";
-    }, FADE);
-  }, delay);
-}
-function fadeOut(el, delay=0){
-  setTimeout(()=>{
-    el.style.opacity="0";
-    setTimeout(()=>{ el.style.visibility="hidden"; }, FADE);
-  }, delay);
-}
-function fadeIn(el, fillFn, delay=0){
-  setTimeout(()=>{
-    fillFn(el);
-    el.style.opacity="0";
-    el.style.visibility="visible";
-    el.getBoundingClientRect();
-    el.style.opacity="1";
-  }, delay);
-}
+function updateRowEl(el,d,weg){
+  const m=minuten(d),col=statusFarbe(m,weg.threshold);
+  const tnum=el.querySelector(".tnum"),tunit=el.querySelector(".tunit"),tdot=el.querySelector(".tdot");
+  if(tnum){tnum.textContent=m<=0?"jetzt":String(m);tnum.style.color=m<=0?"var(--rot)":"";}
+  if(tunit)tunit.textContent=m<=0?"":"min";
+  if(tdot){tdot.style.background=col;
+    const urg=m<=1,was=tdot.classList.contains("urgent");
+    if(urg&&!was){tdot.style.animationDelay=`${-(Date.now()%1800)}ms`;tdot.classList.add("urgent");}
+    else if(!urg&&was){tdot.classList.remove("urgent");tdot.style.animationDelay="";}}}
 
-/* ── Station aktualisieren ── */
 function updateStation(weg){
-  if(!stSlots[weg.id]) initSlots(weg);
-  const {cardEl,rowEls,slotKeys,keyToSlot}=stSlots[weg.id];
-
-  /* Lade-/Fehlerstatus */
+  if(!state[weg.id]){
+    const c=document.createElement("div");c.className="card";
+    c.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="thresh">~${weg.threshold+1} min</span></div>`;
+    state[weg.id]={cardEl:c,rows:new Map()};
+    document.getElementById("board").appendChild(c);}
+  const{cardEl,rows}=state[weg.id];
   let msg=cardEl.querySelector(".card-msg");
   const raw=depCache[weg.id];
   if(!raw){
-    if(!msg){msg=document.createElement("div"); msg.className="card-msg"; cardEl.appendChild(msg);}
+    if(!msg){msg=document.createElement("div");msg.className="card-msg";cardEl.appendChild(msg);}
     msg.className=`card-msg ${errCache[weg.id]?"err":""}`;
-    msg.textContent=errCache[weg.id]?`⚠️ ${errCache[weg.id]} – Retry…`:"Lade…"; return;
-  }
-  if(msg) msg.remove();
-
+    msg.textContent=errCache[weg.id]?`⚠️ ${errCache[weg.id]} – Retry…`:"Lade…";return;}
+  if(msg)msg.remove();
   let deps=raw.filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=0);
-  deps.sort((a,b)=>minuten(a)-minuten(b)); deps=deps.slice(0,PRO_WEG);
-
+  deps.sort((a,b)=>minuten(a)-minuten(b));deps=deps.slice(0,PRO_WEG);
   const newKeySet=new Set(deps.map(getKey));
-  const oldKeySet=new Set(slotKeys.filter(k=>k!==null));
+  let hadDepart=false;
+  for(const[key,rowEl]of rows){
+    if(!newKeySet.has(key)){
+      hadDepart=true;rows.delete(key);
+      rowEl.style.transition=`opacity ${FADE}ms ease`;rowEl.style.opacity="0";
+      setTimeout(()=>{const h=rowEl.offsetHeight;rowEl.style.maxHeight=h+"px";
+        rowEl.getBoundingClientRect();
+        rowEl.style.transition=`max-height ${COLLAPSE}ms ease,padding ${COLLAPSE}ms ease,border-width ${COLLAPSE}ms ease`;
+        rowEl.style.maxHeight="0";rowEl.style.paddingTop="0";rowEl.style.paddingBottom="0";rowEl.style.borderWidth="0";
+      },FADE);
+      setTimeout(()=>rowEl.remove(),FADE+COLLAPSE+40);}}
+  for(const d of deps){const k=getKey(d);if(rows.has(k))updateRowEl(rows.get(k),d,weg);}
+  const enterDelay=hadDepart?FADE+COLLAPSE+40:60;
+  for(const d of deps){const k=getKey(d);
+    if(!rows.has(k)){
+      const rowEl=document.createElement("div");rowEl.className="row";
+      rowEl.style.maxHeight="0";rowEl.style.paddingTop="0";rowEl.style.paddingBottom="0";rowEl.style.opacity="0";
+      fillRowEl(rowEl,d,weg);cardEl.appendChild(rowEl);rows.set(k,rowEl);
+      setTimeout(()=>{
+        rowEl.style.transition=`max-height ${COLLAPSE}ms ease,padding ${COLLAPSE}ms ease,opacity ${FADE}ms ease`;
+        rowEl.style.maxHeight="80px";rowEl.style.paddingTop="";rowEl.style.paddingBottom="";rowEl.style.opacity="1";
+        setTimeout(()=>{rowEl.style.maxHeight="";rowEl.style.transition="";},COLLAPSE+20);
+      },enterDelay);}}}
 
-  /* Departing keys: im Slot aber nicht mehr in deps */
-  const departingKeys=[...oldKeySet].filter(k=>!newKeySet.has(k));
-  /* Arriving deps: in deps aber noch kein Slot */
-  const arrivingDeps=deps.filter(d=>!oldKeySet.has(getKey(d)));
+/* ══ Routen-Panel ═══════════════════════════════════════════════════ */
+function renderRouten(){
+  const panel=document.getElementById("routenPanel");
+  panel.innerHTML="";
+  const srcId="de:09162:1170"; // Silberhornstraße
 
-  /* 1. Bestehende Slots: nur Zeit in-place updaten, CSS-Order aktualisieren */
-  deps.forEach((d,visualIdx)=>{
-    const k=getKey(d);
-    if(oldKeySet.has(k)&&keyToSlot[k]!==undefined){
-      const sl=keyToSlot[k];
-      rowEls[sl].style.order=visualIdx; // neue visuelle Position
-      updateSlot(rowEls[sl],d,weg);
+  ROUTEN.forEach(route=>{
+    const card=document.createElement("div");card.className="rcard";
+    card.innerHTML=`<div class="rhead">
+      <span class="rname">${route.name}</span>
+      <span class="rvia">ab Silberhornstraße · ${route.via}</span>
+    </div>`;
+
+    const raw1=depCache[srcId];
+    if(!raw1){card.innerHTML+=`<div class="rempty">Lade…</div>`;panel.appendChild(card);return;}
+
+    /* Erste-Abschnitt-Abfahrten filtern */
+    let deps1=raw1.filter(d=>!d.cancelled
+      &&(d.label||"").toUpperCase().startsWith(route.a1.linie)
+      &&(d.destination||"").toLowerCase().includes(route.a1.ziel.toLowerCase())
+      &&minuten(d)>=route.a1.fußweg)
+      .sort((a,b)=>minuten(a)-minuten(b)).slice(0,5);
+
+    const raw2=depCache[route.transfer.id];
+    const rows=[];
+
+    for(const dep1 of deps1){
+      const m1=minuten(dep1);
+      const arrMs=Date.now()+(m1+route.transfer.fahrzeit)*60000;
+      const minDep2Ms=arrMs+route.transfer.umstieg*60000;
+
+      if(route.a2){
+        /* Anschluss suchen */
+        const dep2=raw2?.find(d=>!d.cancelled
+          &&(d.label||"").toUpperCase().startsWith(route.a2.linie)
+          &&(d.destination||"").toLowerCase().includes(route.a2.ziel.toLowerCase())
+          &&(d.realtimeDepartureTime||d.plannedDepartureTime)>=minDep2Ms);
+        if(dep2) rows.push({dep1,m1,dep2});
+        /* kein Anschluss → Zeile überspringen */
+      } else {
+        /* Kein zweiter Abschnitt (HM): Ankunftszeit am Transferbahnhof */
+        rows.push({dep1,m1,dep2:null,
+          arrTime:new Date(arrMs).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})});
+      }
+      if(rows.length>=3)break;
     }
-  });
 
-  /* 2. Departing + Arriving koppeln: selber Slot wird wiederverwendet */
-  departingKeys.forEach((dk,i)=>{
-    const sl=keyToSlot[dk];
-    const el=rowEls[sl];
-    const arriving=arrivingDeps[i]||null;
+    if(rows.length===0){
+      card.innerHTML+=`<div class="rempty">${raw2?"Kein Anschluss in den nächsten Abfahrten":"Verbindungsdaten laden…"}</div>`;
+    } else rows.forEach(({dep1,m1,dep2,arrTime})=>{
+      const col=routeFarbe(m1,route.a1.fußweg);
+      const r=m1-route.a1.fußweg;
+      const hint=r<=1?"jetzt laufen!":r<=3?"bald losgehen":"";
+      let connHtml;
+      if(dep2){
+        const waitMin=Math.round(((dep2.realtimeDepartureTime||dep2.plannedDepartureTime)-Date.now())/60000);
+        connHtml=`<span class="rbadge" style="background:${farbe(dep2.label,dep2.transportType)}">${dep2.label}</span>
+                  <span class="rtime">${uhrzeitStr(dep2)}</span>`;
+      } else {
+        connHtml=`<span class="rtime">${route.transfer.label} ${arrTime}</span>`;
+      }
+      card.innerHTML+=`<div class="rrow">
+        <span class="tdot ${r<=1?"urgent":""}" style="background:${col}"></span>
+        <span class="rbadge" style="background:${farbe(dep1.label,dep1.transportType)}">${dep1.label}</span>
+        <span class="rmin">${m1}<span class="tunit"> min</span><span class="rhint">${hint}</span></span>
+        <span class="rarrow">→</span>
+        <span class="rconn">${connHtml}</span>
+      </div>`;
+    });
+    panel.appendChild(card);
+  });}
 
-    if(arriving){
-      /* Crossfade: ausblenden → Inhalt wechseln → einblenden */
-      const visualIdx=deps.findIndex(d=>getKey(d)===getKey(arriving));
-      const newKey=getKey(arriving);
-      crossfade(el, (e)=>{ fillSlot(e,arriving,weg); e.style.order=visualIdx; });
-      delete keyToSlot[dk]; slotKeys[sl]=newKey; keyToSlot[newKey]=sl;
-    } else {
-      /* Keine neue Abfahrt: Slot ausblenden */
-      fadeOut(el);
-      delete keyToSlot[dk]; slotKeys[sl]=null;
-    }
-  });
+/* ══ View-Toggle ════════════════════════════════════════════════════ */
+function setView(v){
+  currentView=v;
+  document.getElementById("viewAbfahrten").classList.toggle("active",v==="abfahrten");
+  document.getElementById("viewRouten").classList.toggle("active",v==="routen");
+  document.getElementById("btnAbfahrten").classList.toggle("active",v==="abfahrten");
+  document.getElementById("btnRouten").classList.toggle("active",v==="routen");
+  document.getElementById("viewTitle").textContent=v==="routen"?"Routen":"Abfahrten";
+  if(v==="routen")renderRouten();}
 
-  /* 3. Überzählige Arrivals (mehr Ankünfte als Abfahrten): freie Slots suchen */
-  arrivingDeps.slice(departingKeys.length).forEach(d=>{
-    const freeSlot=slotKeys.findIndex(k=>k===null); if(freeSlot===-1) return;
-    const k=getKey(d), vIdx=deps.findIndex(dep=>getKey(dep)===k);
-    const el=rowEls[freeSlot];
-    fadeIn(el, (e)=>{ fillSlot(e,d,weg); e.style.order=vIdx; });
-    slotKeys[freeSlot]=k; keyToSlot[k]=freeSlot;
-  });
-}
+/* ══ API ════════════════════════════════════════════════════════════ */
+async function holen(url){let e;
+  for(const p of PROXIES){try{const r=await fetch(p?p+encodeURIComponent(url):url);
+    if(!r.ok)throw new Error("HTTP "+r.status);return await r.json();}catch(err){e=err;}}
+  throw e||new Error("Kein Zugriff");}
 
-/* ── API & Wetter ── */
-async function holen(url){
-  let e; for(const p of PROXIES){
-    try{const r=await fetch(p?p+encodeURIComponent(url):url); if(!r.ok) throw new Error("HTTP "+r.status); return await r.json();}catch(err){e=err;}
-  } throw e||new Error("Kein Zugriff");
-}
-async function fetchStation(weg){
-  try{ depCache[weg.id]=await holen(`${API}/departures?globalId=${weg.id}&limit=40`); errCache[weg.id]=null; clearTimeout(retryTmr[weg.id]); }
-  catch(e){ errCache[weg.id]=e.message||"Fehler"; clearTimeout(retryTmr[weg.id]); retryTmr[weg.id]=setTimeout(()=>fetchStation(weg),RETRY_MS); }
-}
-async function fetchAll(){ await Promise.all(WEGE.map(fetchStation)); }
+async function fetchStop(id){
+  try{depCache[id]=await holen(`${API}/departures?globalId=${id}&limit=40`);
+      errCache[id]=null;clearTimeout(retryTmr[id]);}
+  catch(e){errCache[id]=e.message||"Fehler";clearTimeout(retryTmr[id]);
+            retryTmr[id]=setTimeout(()=>fetchStop(id),RETRY_MS);}}
+
+async function fetchAll(){
+  const all=[...new Set([...WEGE.map(w=>w.id),...ROUTE_STOP_IDS])];
+  await Promise.all(all.map(fetchStop));}
 
 async function fetchWeather(){
-  try{
-    const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1170&longitude=11.5720&current=temperature_2m,weather_code&timezone=Europe%2FBerlin");
-    const d=await r.json(), temp=Math.round(d.current.temperature_2m), code=d.current.weather_code;
-    const icons=[[0,"☀️"],[3,"⛅"],[48,"🌫️"],[67,"🌧️"],[77,"❄️"],[82,"🌦️"],[99,"⛈️"]];
-    document.getElementById("weather").textContent=`${(icons.find(([c])=>code<=c)||["",""])[1]} ${temp}°`;
-  }catch(e){}
-}
+  try{const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1170&longitude=11.5720&current=temperature_2m,weather_code&timezone=Europe%2FBerlin");
+    const d=await r.json(),temp=Math.round(d.current.temperature_2m),code=d.current.weather_code;
+    const ic=[[0,"☀️"],[3,"⛅"],[48,"🌫️"],[67,"🌧️"],[77,"❄️"],[82,"🌦️"],[99,"⛈️"]];
+    document.getElementById("weather").textContent=`${(ic.find(([c])=>code<=c)||["",""])[1]} ${temp}°`;}
+  catch(e){}}
 
-function renderAll(){ WEGE.forEach(updateStation); document.getElementById("updated").textContent="aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
-function clock(){ document.getElementById("clock").textContent=new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}); }
+/* ══ Render-Loop ════════════════════════════════════════════════════ */
+function renderAll(){
+  WEGE.forEach(updateStation);
+  if(currentView==="routen")renderRouten();
+  document.getElementById("updated").textContent=
+    "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
 
-clock(); setInterval(clock,10000);
-fetchWeather(); setInterval(fetchWeather,600000);
-renderAll(); // Slots anlegen (leer)
-fetchAll().then(renderAll); // Daten laden
+function setMinHeights(){
+  if(minHeightSet)return;minHeightSet=true;
+  requestAnimationFrame(()=>{Object.values(state).forEach(s=>{
+    if(s.cardEl&&!s.cardEl.style.minHeight)
+      s.cardEl.style.minHeight=s.cardEl.getBoundingClientRect().height+"px";});});}
+
+function clock(){document.getElementById("clock").textContent=
+  new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});}
+
+clock();setInterval(clock,10000);
+fetchWeather();setInterval(fetchWeather,600000);
+renderAll();
+fetchAll().then(()=>{renderAll();setMinHeights();});
 setInterval(renderAll,RENDER_INT);
 setInterval(()=>fetchAll().then(renderAll),FETCH_INT);
 </script>
