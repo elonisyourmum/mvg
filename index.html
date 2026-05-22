@@ -33,7 +33,7 @@
 
   /* Querformat: 2×2-Raster */
   @media (orientation:landscape){
-    .board{display:grid;grid-template-columns:1fr 1fr;gap:1vmin 1.4vmin;align-items:start;padding:1vmin 1.5vmin 0.5vmin!important;border-right:1px solid var(--line);margin-right:5.5vmin;}
+    .board{display:grid;grid-template-columns:1fr 1fr;gap:1vmin 1.4vmin;align-items:start;padding:1vmin 1.5vmin 0.5vmin!important;border-right:1px solid var(--line);margin-right:2.5vmin;}
     #updated{grid-column:1 / -1;font-size:.65rem;margin-top:0.5vmin;}
     .card{padding:0.7vmin 1vmin 0.35vmin;}
     .station{margin-bottom:0.3vmin;}
@@ -73,9 +73,6 @@
   .card-msg{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
   .card-msg.err{color:var(--rot);}
 
-  .updated{text-align:center;color:var(--muted);font-size:.74rem;font-weight:400;
-           margin-top:.9vmin;font-variant-numeric:tabular-nums;opacity:.6;}
-  .updated.stale{color:var(--rot);opacity:1;font-weight:600;}
 </style>
 </head>
 <body>
@@ -84,6 +81,7 @@
     <h1>Abfahrten</h1>
     <div class="tbar-right">
       <span id="weather"></span>
+      <span id="age" style="font-size:.72em;color:var(--muted);font-variant-numeric:tabular-nums;opacity:.7"></span>
       <span class="clock" id="clock">--:--</span>
     </div>
   </div>
@@ -315,13 +313,7 @@ function renderAll(){
   const board=document.getElementById("board");
   let ts=document.getElementById("updated");
   if(!ts){ts=document.createElement("div");ts.id="updated";ts.className="updated";}
-  if(board.lastChild!==ts)board.appendChild(ts);
-  const stale=Date.now()-lastFetchOk>STALE_MS;
-  const minAlt=Math.round((Date.now()-lastFetchOk)/60000);
-  ts.classList.toggle("stale",stale);
-  ts.textContent=stale
-    ? `⚠ Daten veraltet (vor ${minAlt} min) – keine Verbindung?`
-    : "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
+}
 
 function setMinHeights(){
   if(minHeightSet)return;minHeightSet=true;
@@ -336,10 +328,18 @@ function setMinHeights(){
     });
   });}
 
-function clock(){document.getElementById("clock").textContent=
-  new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});}
+function clock(){
+  document.getElementById("clock").textContent=
+    new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+  const age=document.getElementById("age");
+  if(!age)return;
+  const sec=Math.round((Date.now()-lastFetchOk)/1000);
+  const stale=sec>STALE_MS/1000;
+  age.textContent=stale?`⚠ veraltet`:`${sec}s`;
+  age.style.color=stale?"var(--rot)":sec>20?"var(--gelb)":"var(--muted)";
+  age.style.fontWeight=stale?"600":"400";}
 
-clock();setInterval(clock,10000);
+clock();setInterval(clock,1000);
 fetchWeather();setInterval(fetchWeather,600000);
 fetchMessages().then(()=>renderAll());setInterval(()=>fetchMessages().then(()=>renderAll()),STOERUNG_INT);
 renderAll();
