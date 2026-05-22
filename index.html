@@ -33,7 +33,7 @@
 
   /* Querformat: 2×2-Raster */
   @media (orientation:landscape){
-    .board{display:grid;grid-template-columns:1fr 1fr;gap:1vmin 1.4vmin;align-items:start;padding:1vmin 1.5vmin 0.5vmin!important;border-right:1px solid var(--line);}
+    .board{display:grid;grid-template-columns:1fr 1fr;gap:1vmin 1.4vmin;align-items:start;padding:1vmin 1.5vmin 0.5vmin!important;border-right:1px solid var(--line);margin-right:2.5vmin;}
     #updated{grid-column:1 / -1;font-size:.65rem;margin-top:0.5vmin;}
     .card{padding:0.7vmin 1vmin 0.35vmin;}
     .station{margin-bottom:0.3vmin;}
@@ -70,6 +70,7 @@
 
   .updated{text-align:center;color:var(--muted);font-size:.74rem;font-weight:400;
            margin-top:.9vmin;font-variant-numeric:tabular-nums;opacity:.6;}
+  .updated.stale{color:var(--rot);opacity:1;font-weight:600;}
 </style>
 </head>
 <body>
@@ -93,10 +94,12 @@ const WEGE=[
 
 
 const PRO_WEG=6,FETCH_INT=30000,RENDER_INT=10000,RETRY_MS=10000;
-const FADE=500,COLLAPSE=600;
+const FADE=500,COLLAPSE=600,PULSE_MS=1800; // PULSE_MS muss = CSS pulse-Dauer (1.8s)
 const API="https://www.mvg.de/api/bgw-pt/v3";
 const PROXIES=[""];
 const depCache={},errCache={},retryTmr={};
+let lastFetchOk=Date.now();
+const STALE_MS=120000; // 2 min ohne erfolgreichen Fetch = veraltet
 let minHeightSet=false;
 
 /* ══ Helpers ════════════════════════════════════════════════════════ */
@@ -125,7 +128,7 @@ const state={};
 
 function fillRowEl(el,d,weg){
   const m=minuten(d),col=statusFarbe(m,weg.threshold);
-  const del=m<=1?`;animation-delay:${-(Date.now()%1800)}ms`:"";
+  const del=m<=1?`;animation-delay:${-(Date.now()%PULSE_MS)}ms`:"";
   el.innerHTML=`
     <span class="badge" style="background:${farbe(d.label,d.transportType)}">${d.label||"?"}</span>
     <span class="dest">${d.destination||""}</span>
@@ -143,7 +146,7 @@ function updateRowEl(el,d,weg){
   if(tunit)tunit.textContent=m<=0?"":"min";
   if(tdot){tdot.style.background=col;
     const urg=m<=1,was=tdot.classList.contains("urgent");
-    if(urg&&!was){tdot.style.animationDelay=`${-(Date.now()%1800)}ms`;tdot.classList.add("urgent");}
+    if(urg&&!was){tdot.style.animationDelay=`${-(Date.now()%PULSE_MS)}ms`;tdot.classList.add("urgent");}
     else if(!urg&&was){tdot.classList.remove("urgent");tdot.style.animationDelay="";}}}
 
 function updateStation(weg){
@@ -200,7 +203,7 @@ async function holen(url){let e;
 
 async function fetchStop(id){
   try{depCache[id]=await holen(`${API}/departures?globalId=${id}&limit=40`);
-      errCache[id]=null;clearTimeout(retryTmr[id]);}
+      errCache[id]=null;lastFetchOk=Date.now();clearTimeout(retryTmr[id]);}
   catch(e){errCache[id]=e.message||"Fehler";clearTimeout(retryTmr[id]);
             retryTmr[id]=setTimeout(()=>fetchStop(id),RETRY_MS);}}
 
@@ -220,7 +223,12 @@ function renderAll(){
   let ts=document.getElementById("updated");
   if(!ts){ts=document.createElement("div");ts.id="updated";ts.className="updated";}
   board.appendChild(ts);
-  ts.textContent="aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
+  const stale=Date.now()-lastFetchOk>STALE_MS;
+  const sek=Math.round((Date.now()-lastFetchOk)/60000);
+  ts.classList.toggle("stale",stale);
+  ts.textContent=stale
+    ? `⚠ Daten veraltet (vor ${sek} min) – keine Verbindung?`
+    : "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
 
 function setMinHeights(){
   if(minHeightSet)return;minHeightSet=true;
@@ -241,6 +249,11 @@ function clock(){document.getElementById("clock").textContent=
 clock();setInterval(clock,10000);
 fetchWeather();setInterval(fetchWeather,600000);
 renderAll();
+// Burn-in-Schutz: Inhalt alle 3 min minimal verschieben (OLED)
+document.body.style.transition="transform 4s ease";
+setInterval(()=>{const dx=Math.floor(Math.random()*5)-2,dy=Math.floor(Math.random()*5)-2;
+  document.body.style.transform=`translate(${dx}px,${dy}px)`;},180000);
+
 fetchAll().then(()=>{ renderAll(); setTimeout(setMinHeights, 800); });
 setInterval(renderAll,RENDER_INT);
 setInterval(()=>fetchAll().then(renderAll),FETCH_INT);
