@@ -28,17 +28,18 @@
         font-size:clamp(.82rem,2.8vmin,1.08rem);letter-spacing:.02em;
         padding:.3em .48em;border-radius:7px;line-height:1;}
   .topbar h1{font-size:clamp(.86rem,2.8vmin,1.1rem);font-weight:600;}
-  .topbar .clock{margin-left:auto;color:var(--muted);font-size:clamp(.86rem,2.8vmin,1.06rem);
-                 font-weight:500;font-variant-numeric:tabular-nums;}
+  .tbar-right{display:flex;align-items:center;gap:1em;margin-left:auto;}
+  #weather{font-size:clamp(.74rem,2.3vmin,.95rem);color:var(--muted);white-space:nowrap;}
+  .clock{color:var(--muted);font-size:clamp(.86rem,2.8vmin,1.06rem);
+         font-weight:500;font-variant-numeric:tabular-nums;}
 
   .board{display:flex;flex-direction:column;gap:1.1vmin;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:13px;
         padding:1.1vmin 1.5vmin .55vmin;}
   .station{display:flex;align-items:baseline;gap:.4em;margin-bottom:.55vmin;}
   .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);}
-  /* Schwellenwert-Hinweis neben dem Stationsnamen */
-  .thresh{font-size:.65em;color:var(--muted);font-weight:400;letter-spacing:.01em;}
-  
+  .thresh{font-size:.65em;color:var(--muted);font-weight:400;}
+
   .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.65rem;
        padding:.46vmin 0;}
   .row + .row{border-top:1px solid var(--line);}
@@ -47,26 +48,33 @@
          font-size:clamp(.75rem,2.4vmin,.98rem);}
   .dest{font-size:clamp(.84rem,2.7vmin,1.07rem);font-weight:400;color:#d6dbe1;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .plat{font-size:.72em;color:var(--muted);margin-left:.35em;flex-shrink:0;}
 
   /* Zeitspalte */
-  .tcell{display:flex;align-items:baseline;justify-content:flex-end;gap:.22em;min-width:4.4em;}
-  .tbar{width:3px;height:.85em;border-radius:2px;align-self:center;flex-shrink:0;}
+  .tcell{display:flex;align-items:center;justify-content:flex-end;gap:.3em;min-width:4.4em;}
   .tnum{font-size:clamp(.94rem,3vmin,1.18rem);font-weight:700;color:var(--ink);
         font-variant-numeric:tabular-nums;line-height:1;}
   .tunit{font-size:.67em;color:var(--muted);font-weight:500;}
 
-  .empty{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
-  .err{color:var(--rot);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
-  .loading{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;
-           opacity:.5;}
-  .updated{text-align:center;color:var(--muted);font-size:.74rem;margin-top:.9vmin;opacity:.6;}
+  /* Dot-Indikator */
+  .tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.15;transform:scale(.6);}}
+  .tdot.urgent{animation:pulse .9s ease-in-out infinite;}
+
+  .empty,.err,.loading{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
+  .err{color:var(--rot);}
+  .updated{text-align:center;color:var(--muted);font-size:.74rem;margin-top:.9vmin;
+           font-variant-numeric:tabular-nums;opacity:.6;}
 </style>
 </head>
 <body>
   <div class="topbar">
     <span class="logo">MVV</span>
     <h1>Abfahrten</h1>
-    <span class="clock" id="clock">--:--</span>
+    <div class="tbar-right">
+      <span id="weather"></span>
+      <span class="clock" id="clock">--:--</span>
+    </div>
   </div>
   <div class="board" id="board"></div>
   <div class="updated" id="updated"></div>
@@ -74,22 +82,19 @@
 <script>
 const WEGE = [
   { person:"Silberhornstraße",  id:"de:09162:1170", threshold:9,  filterLine:"U", filterZiel:"" },
-  { person:"Ostfriedhof",       id:"de:09162:1105", threshold:3,  filterLine:"", filterZiel:"" },
-  { person:"St.-Martin-Straße", id:"de:09162:1100", threshold:14, filterLine:"", filterZiel:"" },
+  { person:"Ostfriedhof",       id:"de:09162:1105", threshold:3,  filterLine:"",  filterZiel:"" },
+  { person:"St.-Martin-Straße", id:"de:09162:1100", threshold:14, filterLine:"",  filterZiel:"" },
   { person:"Kolumbusplatz",     id:"de:09162:160",  threshold:11, filterLine:"U", filterZiel:"" },
 ];
 
-const PRO_WEG     = 6;
-const FETCH_INT   = 30000;   // API-Abfrage alle 30 s
-const RENDER_INT  = 10000;   // Anzeige-Update alle 10 s (kein Netzwerk)
-const RETRY_AFTER = 10000;   // Retry nach Fehler nach 10 s
+const PRO_WEG    = 6;
+const FETCH_INT  = 30000;
+const RENDER_INT = 10000;
+const RETRY_MS   = 10000;
 const API = "https://www.mvg.de/api/bgw-pt/v3";
 const PROXIES = [""];
 
-/* Cache: rohe API-Daten pro Station-ID */
-const depCache  = {};   // id → Array von Abfahrten
-const errCache  = {};   // id → Fehlermeldung
-const retryTmr  = {};   // id → setTimeout-Handle
+const depCache = {}, errCache = {}, retryTmr = {};
 
 async function holen(url){
   let lastErr;
@@ -104,33 +109,32 @@ async function holen(url){
   throw lastErr||new Error("Kein Zugriff");
 }
 
-async function fetchStation(weg){
+/* Wetter via Open-Meteo (CORS-frei, kein Key nötig) */
+async function fetchWeather(){
   try{
-    const deps = await holen(`${API}/departures?globalId=${weg.id}&limit=40`);
-    depCache[weg.id] = deps;
-    errCache[weg.id] = null;
-    clearTimeout(retryTmr[weg.id]);
-  }catch(e){
-    errCache[weg.id] = e.message||"Fehler";
-    /* Auto-Retry nach 10 s */
-    clearTimeout(retryTmr[weg.id]);
-    retryTmr[weg.id] = setTimeout(()=>fetchStation(weg), RETRY_AFTER);
-  }
+    const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1351&longitude=11.5820&current=temperature_2m,weather_code&timezone=Europe%2FBerlin");
+    const d = await r.json();
+    const temp = Math.round(d.current.temperature_2m);
+    const code = d.current.weather_code;
+    const icons = [[0,"☀️"],[3,"⛅"],[48,"🌫️"],[67,"🌧️"],[77,"❄️"],[82,"🌦️"],[99,"⛈️"]];
+    const icon = (icons.find(([c])=>code<=c)||["",""])[1];
+    document.getElementById("weather").textContent = `${icon} ${temp}°`;
+  }catch(e){}
 }
-
-async function fetchAll(){ await Promise.all(WEGE.map(fetchStation)); }
+fetchWeather(); setInterval(fetchWeather, 600000);
 
 /* Linienfarben */
 const LINIEN = {
   U1:"#438136",U2:"#C20831",U3:"#EC6726",U4:"#00A984",U5:"#BC7A00",U6:"#0065B1",U7:"#C20831",U8:"#EC6726",
   S1:"#16BAE7",S2:"#76B82A",S3:"#9B268F",S4:"#E30613",S5:"#1c3f94",S6:"#00975F",S7:"#943126",S8:"#5A5A5A",S20:"#ED6B22"
 };
-function farbe(label){
+function farbe(label, type){
   const l=(label||"").toUpperCase();
   if(LINIEN[l]) return LINIEN[l];
-  if(l.startsWith("S")) return "#00903a";
-  if(l.startsWith("U")) return "#0065B1";
-  return "#d11e2a";
+  if(type==="SBAHN"||l.startsWith("S")) return "#00903a";
+  if(type==="UBAHN"||l.startsWith("U")) return "#0065B1";
+  if(type==="TRAM") return "#d11e2a";
+  return "#005CA8";   // Bus + Nachtbus → Blau
 }
 
 function statusFarbe(m, threshold){
@@ -145,71 +149,70 @@ function matcht(dep,weg){
   const label=(dep.label||"").toUpperCase();
   const ziel=(dep.destination||"").toLowerCase();
   if(weg.filterLine){
-    const f=weg.filterLine.toUpperCase().replace("TRAM ","").replace("BUS ","").trim();
+    const f=weg.filterLine.toUpperCase().trim();
     if(!label.startsWith(f)) return false;
   }
   if(weg.filterZiel&&!ziel.includes(weg.filterZiel.toLowerCase())) return false;
   return true;
 }
 
-/* Render – synchron aus Cache (kein Netzwerk) */
+function zeitHtml(m, threshold){
+  const col = statusFarbe(m, threshold);
+  const urgent = m<=1 ? "urgent" : "";
+  if(m<=0) return `<span class="tcell"><span class="tnum" style="color:var(--rot)">jetzt</span><span class="tdot ${urgent}" style="background:${col}"></span></span>`;
+  return `<span class="tcell"><span class="tnum">${m}</span><span class="tunit">min</span><span class="tdot ${urgent}" style="background:${col}"></span></span>`;
+}
+
+async function fetchStation(weg){
+  try{
+    depCache[weg.id] = await holen(`${API}/departures?globalId=${weg.id}&limit=40`);
+    errCache[weg.id] = null;
+    clearTimeout(retryTmr[weg.id]);
+  }catch(e){
+    errCache[weg.id] = e.message||"Fehler";
+    clearTimeout(retryTmr[weg.id]);
+    retryTmr[weg.id] = setTimeout(()=>fetchStation(weg), RETRY_MS);
+  }
+}
+async function fetchAll(){ await Promise.all(WEGE.map(fetchStation)); }
+
 function renderWeg(weg){
   const el=document.createElement("div");el.className="card";
-  el.innerHTML=`<div class="station">
-    <span class="sname">${weg.person}</span>
-    <span class="thresh">~${weg.threshold+1} min</span>
-  </div>`;
-
-  const raw = depCache[weg.id];
+  el.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="thresh">~${weg.threshold+1} min</span></div>`;
+  const raw=depCache[weg.id];
   if(!raw){
-    const msg = errCache[weg.id]
-      ? `<div class="err">⚠️ ${errCache[weg.id]} – Retry läuft…</div>`
-      : `<div class="loading">Lade…</div>`;
-    el.innerHTML += msg;
+    el.innerHTML+=errCache[weg.id]
+      ?`<div class="err">⚠️ ${errCache[weg.id]} – Retry…</div>`
+      :`<div class="loading">Lade…</div>`;
     return el;
   }
-
-  let deps = raw.filter(d=>!d.cancelled && matcht(d,weg) && minuten(d)>=0);
+  let deps=raw.filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=0);
   deps.sort((a,b)=>minuten(a)-minuten(b));
   deps=deps.slice(0,PRO_WEG);
-
   if(deps.length===0){ el.innerHTML+=`<div class="empty">Keine Abfahrten</div>`; return el; }
-
   for(const d of deps){
     const m=minuten(d);
-    const col=statusFarbe(m,weg.threshold);
-    const zeit = m<=0
-      ? `<span class="tcell"><span class="tnum" style="color:var(--rot)">jetzt</span><span class="tbar" style="background:${col}"></span></span>`
-      : `<span class="tcell"><span class="tnum">${m}</span><span class="tunit">min</span><span class="tbar" style="background:${col}"></span></span>`;
+    const plat=d.platform?`<span class="plat">· ${d.platform}</span>`:"";
     el.innerHTML+=`<div class="row">
-      <span class="badge" style="background:${farbe(d.label)}">${d.label||"?"}</span>
-      <span class="dest">${d.destination||""}</span>
-      ${zeit}
+      <span class="badge" style="background:${farbe(d.label,d.transportType)}">${d.label||"?"}</span>
+      <span class="dest">${d.destination||""}${plat}</span>
+      ${zeitHtml(m,weg.threshold)}
     </div>`;
   }
   return el;
 }
 
 function renderAll(){
-  const teile=WEGE.map(renderWeg);
-  document.getElementById("board").replaceChildren(...teile);
+  document.getElementById("board").replaceChildren(...WEGE.map(renderWeg));
   document.getElementById("updated").textContent=
     "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
 }
 
-/* Uhr */
-function clock(){ document.getElementById("clock").textContent=new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
+function clock(){ document.getElementById("clock").textContent=new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}); }
 
-
-/* Start */
 clock(); setInterval(clock,10000);
-/* Erst Daten holen, dann anzeigen */
 fetchAll().then(renderAll);
-
-/* Countdown: Anzeige alle 20 s aus Cache neu berechnen */
 setInterval(renderAll, RENDER_INT);
-
-/* API-Refresh alle 30 s */
 setInterval(()=>fetchAll().then(renderAll), FETCH_INT);
 </script>
 </body>
