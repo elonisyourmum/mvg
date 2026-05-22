@@ -25,6 +25,9 @@
   .topbar h1{font-size:clamp(.86rem,2.8vmin,1.1rem);font-weight:600;}
   .tbar-right{display:flex;align-items:center;gap:1em;margin-left:auto;}
   #weather{font-size:clamp(.74rem,2.3vmin,.95rem);color:var(--muted);white-space:nowrap;}
+  #reload{display:inline-block;font-size:1em;color:var(--muted);opacity:.6;
+          animation:spin 3s linear infinite;will-change:transform;}
+  @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
   .clock{color:var(--muted);font-size:clamp(.86rem,2.8vmin,1.06rem);font-weight:500;font-variant-numeric:tabular-nums;}
 
 
@@ -81,7 +84,7 @@
     <h1>Abfahrten</h1>
     <div class="tbar-right">
       <span id="weather"></span>
-      <span id="age" style="font-size:.72em;color:var(--muted);font-variant-numeric:tabular-nums;opacity:.7"></span>
+      <span id="reload">↻</span>
       <span class="clock" id="clock">--:--</span>
     </div>
   </div>
@@ -311,8 +314,9 @@ async function fetchWeather(){
 function renderAll(){
   lastRenderTime=Date.now();
   // Grün sofort setzen wenn DOM bereit (unabhängig vom 1s Clock-Tick)
-  const age=document.getElementById("age");
-  if(age){age.style.transition="none";age.style.color="var(--gruen)";}
+  const rl=document.getElementById("reload");
+  if(rl){rl.style.transition="none";rl.style.color="var(--gruen)";rl.style.opacity="1";
+    setTimeout(()=>{rl.style.transition="color 1.2s ease, opacity 1.2s ease";rl.style.color="var(--muted)";rl.style.opacity=".6";},800);}
   WEGE.forEach(updateStation);
   const board=document.getElementById("board");
   let ts=document.getElementById("updated");
@@ -337,13 +341,10 @@ function clock(){
     new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
   const age=document.getElementById("age");
   if(!age)return;
-  if(Date.now()-lastFetchOk>STALE_MS){
-    age.textContent="⚠ veraltet";age.style.color="var(--rot)";
-    age.style.fontWeight="600";age.style.transition="";return;}
-  const sec=Math.round((Date.now()-lastRenderTime)/1000);
-  age.textContent=`${sec}s`;age.style.fontWeight="400";
-  if(sec<=1){age.style.transition="none";age.style.color="var(--gruen)";}
-  else{age.style.transition="color 1.5s ease";age.style.color=sec>8?"var(--gelb)":"var(--muted)";}}
+  // Stale: reload rot blinken wenn keine Verbindung
+  const rl=document.getElementById("reload");
+  if(rl&&Date.now()-lastFetchOk>STALE_MS){
+    rl.style.color="var(--rot)";rl.style.opacity="1";}}
 
 clock();setInterval(clock,1000);
 fetchWeather();setInterval(fetchWeather,600000);
