@@ -38,7 +38,7 @@
   .row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:.65rem;
        padding:.46vmin 0;overflow:hidden;
        transition:opacity 500ms ease,max-height 600ms ease,padding 600ms ease,border-width 600ms ease;}
-  .row:not(:last-child){border-bottom:1px solid var(--line);}
+  .row + .row{border-top:1px solid var(--line);}
   .badge{color:#fff;border-radius:6px;font-weight:700;padding:.13em .44em;min-width:2.3em;
          text-align:center;font-size:clamp(.75rem,2.4vmin,.98rem);}
   .dest{font-size:clamp(.84rem,2.7vmin,1.07rem);font-weight:400;color:#d6dbe1;
@@ -55,8 +55,8 @@
   .card-msg.err{color:var(--rot);}
 
   /* ── Bottom Nav ──
-  .updated{display:block;text-align:center;color:var(--muted);font-size:.74rem;font-weight:400;
-           margin-top:.9vmin;font-variant-numeric:tabular-nums;opacity:.6;padding:0 2.5vmin;}
+  .updated{text-align:center;color:var(--muted);font-size:.74rem;font-weight:400;
+           margin-top:.9vmin;font-variant-numeric:tabular-nums;opacity:.6;}
 </style>
 </head>
 <body>
@@ -69,7 +69,6 @@
     </div>
   </div>
   <div class="board" id="board"></div>
-  </div>
   <div class="updated" id="updated"></div>
 
 <script>
@@ -175,7 +174,10 @@ function updateStation(weg){
         rowEl.style.transition=`max-height ${COLLAPSE}ms ease,padding ${COLLAPSE}ms ease,opacity ${FADE}ms ease`;
         rowEl.style.maxHeight="80px";rowEl.style.paddingTop="";rowEl.style.paddingBottom="";rowEl.style.opacity="1";
         setTimeout(()=>{rowEl.style.maxHeight="";rowEl.style.transition="";},COLLAPSE+20);
-      },enterDelay);}}}
+      },enterDelay);
+    }}
+  // Sortierte DOM-Reihenfolge herstellen (neue Zeilen an korrekter Position)
+  for(const d of deps){const k=getKey(d);const el=rows.get(k);if(el)cardEl.appendChild(el);}}
 
 /\* ══ View-Toggle ════════════════════════════════════════════════════ */
 
