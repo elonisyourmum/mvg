@@ -54,7 +54,7 @@
   .card-msg{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
   .card-msg.err{color:var(--rot);}
 
-  /* ── Bottom Nav ──
+  /* ── Bottom Nav ── */
   .updated{text-align:center;color:var(--muted);font-size:.74rem;font-weight:400;
            margin-top:.9vmin;font-variant-numeric:tabular-nums;opacity:.6;}
 </style>
@@ -69,8 +69,6 @@
     </div>
   </div>
   <div class="board" id="board"></div>
-  <div class="updated" id="updated"></div>
-
 <script>
 /* ══ Konfiguration ══════════════════════════════════════════════════ */
 const WEGE=[
@@ -205,8 +203,11 @@ async function fetchWeather(){
 /* ══ Render-Loop ════════════════════════════════════════════════════ */
 function renderAll(){
   WEGE.forEach(updateStation);
-  document.getElementById("updated").textContent=
-    "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
+  const board=document.getElementById("board");
+  let ts=document.getElementById("updated");
+  if(!ts){ts=document.createElement("div");ts.id="updated";ts.className="updated";}
+  board.appendChild(ts);
+  ts.textContent="aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
 
 function setMinHeights(){
   if(minHeightSet)return;minHeightSet=true;
