@@ -310,6 +310,9 @@ async function fetchWeather(){
 /* ══ Render-Loop ════════════════════════════════════════════════════ */
 function renderAll(){
   lastRenderTime=Date.now();
+  // Grün sofort setzen wenn DOM bereit (unabhängig vom 1s Clock-Tick)
+  const age=document.getElementById("age");
+  if(age){age.style.transition="none";age.style.color="var(--gruen)";}
   WEGE.forEach(updateStation);
   const board=document.getElementById("board");
   let ts=document.getElementById("updated");
@@ -339,12 +342,9 @@ function clock(){
     age.style.fontWeight="600";age.style.transition="";return;}
   const sec=Math.round((Date.now()-lastRenderTime)/1000);
   age.textContent=`${sec}s`;age.style.fontWeight="400";
-  if(sec===0){
-    age.style.transition="none";age.style.color="var(--gruen)";
-  } else {
-    age.style.transition="color 1.5s ease";
-    age.style.color=sec>8?"var(--gelb)":"var(--muted)";
-  }}
+  // sec=0 wird in renderAll() direkt gesetzt; hier nur Fade-Back + Countdown
+  age.style.transition="color 1.5s ease";
+  age.style.color=sec>8?"var(--gelb)":"var(--muted)";}
 
 clock();setInterval(clock,1000);
 fetchWeather();setInterval(fetchWeather,600000);
