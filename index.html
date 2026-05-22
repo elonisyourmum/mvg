@@ -45,7 +45,7 @@
     .tnum{font-size:clamp(.84rem,2.5vmin,1rem);}
   }
   .card{background:var(--card);border:1px solid var(--line);border-radius:13px;
-        padding:1.1vmin 1.5vmin .55vmin;overflow:hidden;}
+        padding:1.1vmin 1.5vmin .55vmin;overflow:hidden;position:relative;}
   .station{display:flex;align-items:baseline;gap:.4em;margin-bottom:.55vmin;}
   .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);flex-shrink:0;}
   .thresh{font-size:.65em;color:var(--muted);font-weight:400;flex-shrink:0;}
@@ -56,8 +56,7 @@
                   animation:marquee 14s linear infinite;}
   @keyframes marquee{from{transform:translateX(100%);}to{transform:translateX(-100%);}}
   .row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:.65rem;
-       padding:.46vmin 0;overflow:hidden;
-       transition:opacity 500ms ease,max-height 600ms ease,padding 600ms ease,border-width 600ms ease;}
+       padding:.46vmin 0;}
   .row + .row{border-top:1px solid var(--line);}
   .badge{color:#fff;border-radius:6px;font-weight:700;padding:.13em .44em;min-width:2.3em;
          text-align:center;font-size:clamp(.75rem,2.4vmin,.98rem);}
@@ -190,37 +189,58 @@ function updateStation(weg){
       }else stoerEl.innerHTML="";
     }
   }
-  let hadDepart=false;
+  // ═══ FLIP-Animation: korrekte Sortierung + smoothe Übergänge ═══
+  // FIRST: aktuelle Positionen aller bestehenden Zeilen merken
+  const firstTop=new Map();
+  for(const[k,el]of rows)firstTop.set(k,el.offsetTop);
+
+  // Abfahrende Zeilen: aus dem Fluss nehmen (absolute) + ausblenden
+  // → so verschieben sie die Sortierung der anderen nicht
   for(const[key,rowEl]of rows){
     if(!newKeySet.has(key)){
-      hadDepart=true;rows.delete(key);
+      rows.delete(key);
+      const top=rowEl.offsetTop;
+      rowEl.style.position="absolute";rowEl.style.top=top+"px";
+      rowEl.style.left="0";rowEl.style.right="0";rowEl.style.pointerEvents="none";
       rowEl.style.transition=`opacity ${FADE}ms ease`;rowEl.style.opacity="0";
-      setTimeout(()=>{const h=rowEl.offsetHeight;rowEl.style.maxHeight=h+"px";
-        rowEl.getBoundingClientRect();
-        rowEl.style.transition=`max-height ${COLLAPSE}ms ease,padding ${COLLAPSE}ms ease,border-width ${COLLAPSE}ms ease`;
-        rowEl.style.maxHeight="0";rowEl.style.paddingTop="0";rowEl.style.paddingBottom="0";rowEl.style.borderWidth="0";
-      },FADE);
-      setTimeout(()=>rowEl.remove(),FADE+COLLAPSE+40);}}
+      setTimeout(()=>rowEl.remove(),FADE+40);
+    }}
+
+  // Bestehende Zeilen aktualisieren
   for(const d of deps){const k=getKey(d);if(rows.has(k))updateRowEl(rows.get(k),d,weg);}
-  const enterDelay=hadDepart?FADE+COLLAPSE+40:60;
-  const sortedKeys=deps.map(getKey);
+
+  // Neue Zeilen anlegen (volle Höhe, opacity 0 – Position macht der Reorder)
+  const sortedKeys=deps.map(getKey),newRows=new Set();
   for(let i=0;i<deps.length;i++){
-    const d=deps[i],k=sortedKeys[i];
+    const k=sortedKeys[i];
     if(!rows.has(k)){
       const rowEl=document.createElement("div");rowEl.className="row";
-      rowEl.style.maxHeight="0";rowEl.style.paddingTop="0";rowEl.style.paddingBottom="0";rowEl.style.opacity="0";
-      fillRowEl(rowEl,d,weg);
-      // Korrekte sortierte Position: vor die nächste bereits vorhandene Zeile einfügen
-      let refEl=null;
-      for(let j=i+1;j<sortedKeys.length;j++){if(rows.has(sortedKeys[j])){refEl=rows.get(sortedKeys[j]);break;}}
-      rows.set(k,rowEl);
-      if(refEl)cardEl.insertBefore(rowEl,refEl);else cardEl.appendChild(rowEl);
-      setTimeout(()=>{
-        rowEl.style.transition=`max-height ${COLLAPSE}ms ease,padding ${COLLAPSE}ms ease,opacity ${FADE}ms ease`;
-        rowEl.style.maxHeight="120px";rowEl.style.paddingTop="";rowEl.style.paddingBottom="";rowEl.style.opacity="1";
-        setTimeout(()=>{rowEl.style.maxHeight="";rowEl.style.transition="";},COLLAPSE+20);
-      },enterDelay);
-    }}}
+      rowEl.style.opacity="0";fillRowEl(rowEl,deps[i],weg);
+      rows.set(k,rowEl);newRows.add(rowEl);cardEl.appendChild(rowEl);
+    }}
+
+  // Alle Zeilen in korrekte sortierte DOM-Reihenfolge bringen
+  const headerEl=cardEl.querySelector(".station");
+  let prev=headerEl;
+  for(const d of deps){const el=rows.get(getKey(d));if(el){prev.after(el);prev=el;}}
+
+  // LAST + INVERT + PLAY: Positionswechsel smooth animieren
+  requestAnimationFrame(()=>{
+    for(const[k,el]of rows){
+      if(newRows.has(el)){ // neue Zeile: einblenden
+        el.style.transition=`opacity ${FADE}ms ease`;el.style.opacity="1";continue;}
+      if(!firstTop.has(k))continue;
+      const delta=firstTop.get(k)-el.offsetTop;
+      if(Math.abs(delta)>0.5){
+        el.style.transition="none";el.style.transform=`translateY(${delta}px)`;
+        el.getBoundingClientRect(); // reflow erzwingen
+        requestAnimationFrame(()=>{
+          el.style.transition=`transform ${COLLAPSE}ms ease`;el.style.transform="";
+          setTimeout(()=>{el.style.transition="";},COLLAPSE+30);
+        });
+      }
+    }
+  });}
 
 
 /* ══ API ════════════════════════════════════════════════════════════ */
@@ -285,7 +305,7 @@ function renderAll(){
 
 function setMinHeights(){
   if(minHeightSet)return;minHeightSet=true;
-  // Warten bis Zeilen-Animationen (enterDelay 60ms + expand 600ms) fertig sind
+  // Warten bis initiale Einblend-Animation (FADE) fertig ist
   requestAnimationFrame(()=>{
     Object.values(state).forEach(s=>{
       if(s.cardEl){
