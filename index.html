@@ -9,13 +9,12 @@
     --bg:#0e1116;--card:#171b22;--line:#242a33;
     --ink:#f4f6f8;--muted:#8b95a1;--mgv:#0065B1;
     --gruen:#5ba368;--gelb:#c49a2e;--rot:#e85d4a;
-    --nav-h:52px;
     --sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI","Helvetica Neue",Arial,sans-serif;
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{font-family:var(--sys);background:var(--bg);color:var(--ink);overflow-y:auto;
        min-height:100vh;user-select:none;-webkit-font-smoothing:antialiased;
-       padding-bottom:calc(var(--nav-h) + 8px);}
+       padding:0 0 1vmin;}
 
   .topbar{display:flex;align-items:center;gap:1.1vmin;
           padding:1.6vmin 2.5vmin 1.2vmin;border-bottom:1px solid var(--line);
@@ -28,8 +27,6 @@
   #weather{font-size:clamp(.74rem,2.3vmin,.95rem);color:var(--muted);white-space:nowrap;}
   .clock{color:var(--muted);font-size:clamp(.86rem,2.8vmin,1.06rem);font-weight:500;font-variant-numeric:tabular-nums;}
 
-  .view{display:none;padding:1.5vmin 2.5vmin .5vmin;}
-  .view.active{display:block;}
 
   /* ── Abfahrten ── */
   .board{display:flex;flex-direction:column;gap:1.1vmin;}
@@ -57,32 +54,7 @@
   .card-msg{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
   .card-msg.err{color:var(--rot);}
 
-  /* ── Routen ── */
-  .rboard{display:flex;flex-direction:column;gap:1.2vmin;}
-  .rcard{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:1.1vmin 1.5vmin .7vmin;}
-  .rhead{margin-bottom:.7vmin;}
-  .rname{font-weight:600;font-size:clamp(.9rem,2.8vmin,1.12rem);}
-  .rvia{display:block;font-size:.7em;color:var(--muted);margin-top:.15em;}
-  .rrow{display:flex;align-items:center;gap:.55rem;padding:.44vmin 0;flex-wrap:nowrap;}
-  .rrow:not(:last-child){border-bottom:1px solid var(--line);}
-  .rbadge{color:#fff;border-radius:5px;font-weight:700;padding:.1em .38em;
-          font-size:clamp(.7rem,2.1vmin,.88rem);white-space:nowrap;flex-shrink:0;}
-  .rmin{font-size:clamp(.88rem,2.7vmin,1.08rem);font-weight:700;font-variant-numeric:tabular-nums;}
-  .rhint{font-size:.7em;color:var(--muted);font-weight:400;margin-left:.2em;}
-  .rarrow{color:var(--muted);font-size:.8em;flex-shrink:0;}
-  .rconn{display:flex;align-items:center;gap:.4em;margin-left:auto;white-space:nowrap;}
-  .rtime{font-size:clamp(.78rem,2.3vmin,.95rem);color:var(--muted);font-variant-numeric:tabular-nums;}
-  .rempty{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.4vmin 0;}
-  .rmiss{color:var(--rot);font-size:.7em;margin-left:.3em;}
-
-  /* ── Bottom Nav ── */
-  .bottomnav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);
-             background:var(--card);border-top:1px solid var(--line);display:flex;z-index:20;}
-  .navbtn{flex:1;background:none;border:none;color:var(--muted);font-family:var(--sys);
-          font-size:clamp(.78rem,2.6vmin,1rem);font-weight:600;cursor:pointer;transition:color .2s;}
-  .navbtn.active{color:var(--mgv);}
-  .navbtn.active::after{content:'';display:block;height:2px;background:var(--mgv);
-                        border-radius:1px;margin:2px auto 0;width:30%;}
+  /* ── Bottom Nav ──
   .updated{text-align:center;color:var(--muted);font-size:.74rem;margin-top:.9vmin;
            font-variant-numeric:tabular-nums;opacity:.6;padding:0 2.5vmin;}
 </style>
@@ -90,23 +62,15 @@
 <body>
   <div class="topbar">
     <span class="logo">MVV</span>
-    <h1 id="viewTitle">Abfahrten</h1>
+    <h1>Abfahrten</h1>
     <div class="tbar-right">
       <span id="weather"></span>
       <span class="clock" id="clock">--:--</span>
     </div>
   </div>
-  <div id="viewAbfahrten" class="view active">
-    <div class="board" id="board"></div>
-  </div>
-  <div id="viewRouten" class="view">
-    <div class="rboard" id="routenPanel"></div>
+  <div class="board" id="board"></div>
   </div>
   <div class="updated" id="updated"></div>
-  <div class="bottomnav">
-    <button class="navbtn active" id="btnAbfahrten" onclick="setView('abfahrten')">Abfahrten</button>
-    <button class="navbtn" id="btnRouten" onclick="setView('routen')">Routen</button>
-  </div>
 
 <script>
 /* ══ Konfiguration ══════════════════════════════════════════════════ */
@@ -117,38 +81,13 @@ const WEGE=[
   {person:"Kolumbusplatz",    id:"de:09162:160", threshold:11,filterLine:"U",filterZiel:""},
 ];
 
-/* Umstiegsbahnhöfe – nur für Routen-Panel, nicht auf der Haupttafel */
-const ROUTE_STOP_IDS=["de:09162:50","de:09162:100","de:09162:920"];
-
-/* Route-Definitionen
-   a1 = erster Abschnitt (ab Silberhornstraße)
-   transfer = Umstiegsinfo (Fahrzeit in min, Mindest-Umstiegszeit)
-   a2 = zweiter Abschnitt (Anschlussverbindung), null = nur Ankuft zeigen */
-const ROUTEN=[
-  { name:"Hochschule München", via:"Hbf → Fußweg ~5 min",
-    a1:{linie:"U2",ziel:"Feldmoching",fußweg:3},
-    transfer:{id:"de:09162:100",fahrzeit:6,umstieg:4,label:"Hbf"},
-    a2:null },
-  { name:"Garching", via:"Sendlinger Tor → U6",
-    a1:{linie:"U2",ziel:"Feldmoching",fußweg:3},
-    transfer:{id:"de:09162:50",fahrzeit:4,umstieg:3,label:"Sdlg. Tor"},
-    a2:{linie:"U6",ziel:"Garching"} },
-  { name:"Haar", via:"Trudering → S2 Richtung Erding",
-    a1:{linie:"U2",ziel:"Messestadt",fußweg:3},
-    transfer:{id:"de:09162:920",fahrzeit:10,umstieg:3,label:"Trudering"},
-    a2:{linie:"S2",ziel:"Erding"} },
-  { name:"Karlsfeld", via:"Hbf → S2 Richtung Petershausen",
-    a1:{linie:"U2",ziel:"Feldmoching",fußweg:3},
-    transfer:{id:"de:09162:100",fahrzeit:6,umstieg:4,label:"Hbf"},
-    a2:{linie:"S2",ziel:"Petershausen"} },
-];
 
 const PRO_WEG=6,FETCH_INT=30000,RENDER_INT=10000,RETRY_MS=10000;
 const FADE=500,COLLAPSE=600;
 const API="https://www.mvg.de/api/bgw-pt/v3";
 const PROXIES=[""];
 const depCache={},errCache={},retryTmr={};
-let currentView="abfahrten",minHeightSet=false;
+let minHeightSet=false;
 
 /* ══ Helpers ════════════════════════════════════════════════════════ */
 function getKey(d){return`${d.label}|${d.destination}|${d.plannedDepartureTime}`;}
@@ -238,87 +177,7 @@ function updateStation(weg){
         setTimeout(()=>{rowEl.style.maxHeight="";rowEl.style.transition="";},COLLAPSE+20);
       },enterDelay);}}}
 
-/* ══ Routen-Panel ═══════════════════════════════════════════════════ */
-function renderRouten(){
-  const panel=document.getElementById("routenPanel");
-  panel.innerHTML="";
-  const srcId="de:09162:1170"; // Silberhornstraße
-
-  ROUTEN.forEach(route=>{
-    const card=document.createElement("div");card.className="rcard";
-    card.innerHTML=`<div class="rhead">
-      <span class="rname">${route.name}</span>
-      <span class="rvia">ab Silberhornstraße · ${route.via}</span>
-    </div>`;
-
-    const raw1=depCache[srcId];
-    if(!raw1){card.innerHTML+=`<div class="rempty">Lade…</div>`;panel.appendChild(card);return;}
-
-    /* Erste-Abschnitt-Abfahrten filtern */
-    let deps1=raw1.filter(d=>!d.cancelled
-      &&(d.label||"").toUpperCase().startsWith(route.a1.linie)
-      &&(d.destination||"").toLowerCase().includes(route.a1.ziel.toLowerCase())
-      &&minuten(d)>=route.a1.fußweg)
-      .sort((a,b)=>minuten(a)-minuten(b)).slice(0,5);
-
-    const raw2=depCache[route.transfer.id];
-    const rows=[];
-
-    for(const dep1 of deps1){
-      const m1=minuten(dep1);
-      const arrMs=Date.now()+(m1+route.transfer.fahrzeit)*60000;
-      const minDep2Ms=arrMs+route.transfer.umstieg*60000;
-
-      if(route.a2){
-        /* Anschluss suchen */
-        const dep2=raw2?.find(d=>!d.cancelled
-          &&(d.label||"").toUpperCase().startsWith(route.a2.linie)
-          &&(d.destination||"").toLowerCase().includes(route.a2.ziel.toLowerCase())
-          &&(d.realtimeDepartureTime||d.plannedDepartureTime)>=minDep2Ms);
-        if(dep2) rows.push({dep1,m1,dep2});
-        /* kein Anschluss → Zeile überspringen */
-      } else {
-        /* Kein zweiter Abschnitt (HM): Ankunftszeit am Transferbahnhof */
-        rows.push({dep1,m1,dep2:null,
-          arrTime:new Date(arrMs).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})});
-      }
-      if(rows.length>=3)break;
-    }
-
-    if(rows.length===0){
-      card.innerHTML+=`<div class="rempty">${raw2?"Kein Anschluss in den nächsten Abfahrten":"Verbindungsdaten laden…"}</div>`;
-    } else rows.forEach(({dep1,m1,dep2,arrTime})=>{
-      const col=routeFarbe(m1,route.a1.fußweg);
-      const r=m1-route.a1.fußweg;
-      const hint=r<=1?"jetzt laufen!":r<=3?"bald losgehen":"";
-      let connHtml;
-      if(dep2){
-        const waitMin=Math.round(((dep2.realtimeDepartureTime||dep2.plannedDepartureTime)-Date.now())/60000);
-        connHtml=`<span class="rbadge" style="background:${farbe(dep2.label,dep2.transportType)}">${dep2.label}</span>
-                  <span class="rtime">${uhrzeitStr(dep2)}</span>`;
-      } else {
-        connHtml=`<span class="rtime">${route.transfer.label} ${arrTime}</span>`;
-      }
-      card.innerHTML+=`<div class="rrow">
-        <span class="tdot ${r<=1?"urgent":""}" style="background:${col}"></span>
-        <span class="rbadge" style="background:${farbe(dep1.label,dep1.transportType)}">${dep1.label}</span>
-        <span class="rmin">${m1}<span class="tunit"> min</span><span class="rhint">${hint}</span></span>
-        <span class="rarrow">→</span>
-        <span class="rconn">${connHtml}</span>
-      </div>`;
-    });
-    panel.appendChild(card);
-  });}
-
-/* ══ View-Toggle ════════════════════════════════════════════════════ */
-function setView(v){
-  currentView=v;
-  document.getElementById("viewAbfahrten").classList.toggle("active",v==="abfahrten");
-  document.getElementById("viewRouten").classList.toggle("active",v==="routen");
-  document.getElementById("btnAbfahrten").classList.toggle("active",v==="abfahrten");
-  document.getElementById("btnRouten").classList.toggle("active",v==="routen");
-  document.getElementById("viewTitle").textContent=v==="routen"?"Routen":"Abfahrten";
-  if(v==="routen")renderRouten();}
+/\* ══ View-Toggle ════════════════════════════════════════════════════ */
 
 /* ══ API ════════════════════════════════════════════════════════════ */
 async function holen(url){let e;
@@ -332,9 +191,7 @@ async function fetchStop(id){
   catch(e){errCache[id]=e.message||"Fehler";clearTimeout(retryTmr[id]);
             retryTmr[id]=setTimeout(()=>fetchStop(id),RETRY_MS);}}
 
-async function fetchAll(){
-  const all=[...new Set([...WEGE.map(w=>w.id),...ROUTE_STOP_IDS])];
-  await Promise.all(all.map(fetchStop));}
+async function fetchAll(){await Promise.all(WEGE.map(w=>fetchStop(w.id)));}
 
 async function fetchWeather(){
   try{const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1170&longitude=11.5720&current=temperature_2m,weather_code&timezone=Europe%2FBerlin");
@@ -346,7 +203,6 @@ async function fetchWeather(){
 /* ══ Render-Loop ════════════════════════════════════════════════════ */
 function renderAll(){
   WEGE.forEach(updateStation);
-  if(currentView==="routen")renderRouten();
   document.getElementById("updated").textContent=
     "aktualisiert "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
 
