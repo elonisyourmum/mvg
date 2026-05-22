@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>MVV Abfahrten</title>
 <style>
   :root{
@@ -14,7 +14,7 @@
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{font-family:var(--sys);background:var(--bg);color:var(--ink);overflow-y:auto;
        min-height:100vh;user-select:none;-webkit-font-smoothing:antialiased;
-       padding:0 0 1vmin;}
+       padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(1vmin + env(safe-area-inset-bottom)) env(safe-area-inset-left);}
 
   .topbar{display:flex;align-items:center;gap:1.1vmin;
           padding:1.6vmin 2.5vmin 1.2vmin;border-bottom:1px solid var(--line);
@@ -60,7 +60,6 @@
   .card-msg{color:var(--muted);font-size:clamp(.74rem,2.1vmin,.9rem);padding:.35vmin 0;}
   .card-msg.err{color:var(--rot);}
 
-  /* ── Bottom Nav ──
   .updated{text-align:center;color:var(--muted);font-size:.74rem;font-weight:400;
            margin-top:.9vmin;font-variant-numeric:tabular-nums;opacity:.6;}
 </style>
