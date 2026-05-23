@@ -435,21 +435,39 @@ let dbJourneys={},dbActive=false,dbInited=false,dbTimer=null;
 async function dbResolve(){
   await Promise.all(DB_ROUTES.map(async r=>{
     try{
-      const res=await fetch(`${DB_API}/locations?query=${encodeURIComponent(r.q)}&results=1`);
+      const url=`${DB_API}/locations?query=${encodeURIComponent(r.q)}&results=1`;
+      console.log("[DB] resolve:",url);
+      const res=await fetch(url);
+      if(!res.ok)throw new Error(`HTTP ${res.status}`);
       const d=await res.json();
+      console.log("[DB] resolved",r.q,"→",d[0]?.id,d[0]?.name);
       if(d[0])r.id=d[0].id;
-    }catch(e){console.error("dbResolve",r.q,e);}
+      else throw new Error("keine Ergebnisse");
+    }catch(e){
+      console.error("[DB] resolve FEHLER",r.q,e);
+      r.resolveErr=e.message||String(e);
+    }
   }));
 }
 
 async function dbFetchAll(){
   await Promise.all(DB_ROUTES.map(async r=>{
-    if(!r.id)return;
+    if(!r.id){
+      dbJourneys[r.name]={journeys:[],err:`Station nicht aufgelöst: ${r.resolveErr||"unbekannt"}`};
+      return;
+    }
     try{
-      const res=await fetch(`${DB_API}/journeys?from=${MUC_HBF}&to=${encodeURIComponent(r.id)}&results=6&language=de`);
+      const url=`${DB_API}/journeys?from=${MUC_HBF}&to=${encodeURIComponent(r.id)}&results=6&language=de`;
+      console.log("[DB] journey fetch:",url);
+      const res=await fetch(url);
+      if(!res.ok)throw new Error(`HTTP ${res.status}`);
       const d=await res.json();
+      console.log("[DB] journeys",r.name,"→",d.journeys?.length,"Verbindungen");
       dbJourneys[r.name]={journeys:d.journeys||[],err:null};
-    }catch(e){dbJourneys[r.name]={journeys:[],err:String(e)};}
+    }catch(e){
+      console.error("[DB] journey FEHLER",r.name,e);
+      dbJourneys[r.name]={journeys:[],err:e.message||String(e)};
+    }
   }));
   dbRender();
 }
@@ -531,13 +549,14 @@ function dbRender(){
   });
 }
 
-function dbOpen(){
+async function dbOpen(){
   document.getElementById("board").style.display="none";
   document.getElementById("db-board").style.display="";
   document.getElementById("db-btn").classList.add("active");
   document.getElementById("mvv-logo").style.opacity=".5";
-  if(!dbInited){dbInited=true;dbResolve().then(dbFetchAll);}
-  else dbFetchAll();
+  // Stationen auflösen falls noch nicht erledigt
+  if(DB_ROUTES.some(r=>!r.id))await dbResolve();
+  await dbFetchAll();
   if(dbTimer)clearInterval(dbTimer);
   dbTimer=setInterval(dbFetchAll,300000);
 }
