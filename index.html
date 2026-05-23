@@ -425,6 +425,8 @@ setInterval(()=>fetchAll().then(renderAll),FETCH_INT);
 
 // ===== DB Fernverkehr =====
 const DB_API="https://v6.db.transport.rest";
+const DB_PROXY="https://corsproxy.io/?url=";
+const dbUrl=path=>DB_PROXY+encodeURIComponent(DB_API+path);
 const MUC_HBF="8000261";
 const DB_ROUTES=[
   {name:"Bayreuth Hbf", q:"Bayreuth Hbf",  id:null},
@@ -435,7 +437,7 @@ let dbJourneys={},dbActive=false,dbInited=false,dbTimer=null;
 async function dbResolve(){
   await Promise.all(DB_ROUTES.map(async r=>{
     try{
-      const url=`${DB_API}/locations?query=${encodeURIComponent(r.q)}&results=1`;
+      const url=dbUrl(`/locations?query=${encodeURIComponent(r.q)}&results=1`);
       console.log("[DB] resolve:",url);
       const res=await fetch(url);
       if(!res.ok)throw new Error(`HTTP ${res.status}`);
@@ -457,7 +459,7 @@ async function dbFetchAll(){
       return;
     }
     try{
-      const url=`${DB_API}/journeys?from=${MUC_HBF}&to=${encodeURIComponent(r.id)}&results=6&language=de`;
+      const url=dbUrl(`/journeys?from=${MUC_HBF}&to=${encodeURIComponent(r.id)}&results=6&language=de`);
       console.log("[DB] journey fetch:",url);
       const res=await fetch(url);
       if(!res.ok)throw new Error(`HTTP ${res.status}`);
