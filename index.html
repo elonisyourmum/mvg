@@ -17,7 +17,7 @@
        padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(1vmin + env(safe-area-inset-bottom)) env(safe-area-inset-left);}
 
   .topbar{display:flex;align-items:center;gap:1.1vmin;
-          padding:1.6vmin 2.5vmin 1.2vmin;border-bottom:1px solid var(--line);
+          padding:1vmin 2.5vmin .8vmin;border-bottom:1px solid var(--line);
           position:sticky;top:0;background:var(--bg);z-index:10;}
   .logo{background:var(--mgv);color:#fff;font-weight:700;
         font-size:clamp(.82rem,2.8vmin,1.08rem);letter-spacing:.02em;
@@ -88,7 +88,7 @@
 <body>
   <div class="topbar">
     <span class="logo">MVV</span>
-    <h1>Abfahrten</h1>
+    <h1 id="datum">–</h1>
     <div class="tbar-right">
       <span id="weather"></span>
       <span id="reload"></span>
@@ -373,11 +373,12 @@ function setMinHeights(){
   });}
 
 function clock(){
+  const now=new Date();
   document.getElementById("clock").textContent=
-    new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
-  const age=document.getElementById("age");
-  if(!age)return;
-  // Stale: reload rot blinken wenn keine Verbindung
+    now.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+  const dt=document.getElementById("datum");
+  if(dt)dt.textContent=now.toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"long"});
+  // Stale: reload rot wenn keine Verbindung
   const rl=document.getElementById("reload");
   if(rl){const stale=Date.now()-lastFetchOk>STALE_MS;
     rl.style.borderTopColor=stale?"var(--rot)":"";rl.style.opacity=stale?"1":"";}}
