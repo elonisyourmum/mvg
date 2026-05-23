@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
@@ -425,8 +425,24 @@ setInterval(()=>fetchAll().then(renderAll),FETCH_INT);
 
 // ===== DB Fernverkehr =====
 const DB_API="https://v6.db.transport.rest";
-const DB_PROXY="https://corsproxy.io/?url=";
-const dbUrl=path=>DB_PROXY+encodeURIComponent(DB_API+path);
+const DB_PROXIES=[
+  "",                                      // direkt (Fully Kiosk: CORS aus → klappt)
+  "https://api.allorigins.win/raw?url=",   // Fallback 1
+  "https://corsproxy.io/?url="              // Fallback 2
+];
+async function dbFetch(path){
+  const full=DB_API+path;
+  let lastErr;
+  for(const px of DB_PROXIES){
+    try{
+      const url=px?px+encodeURIComponent(full):full;
+      const res=await fetch(url);
+      if(!res.ok)throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    }catch(e){lastErr=e;console.warn("[DB] Proxy versagt:",px||"direkt","→",e.message);}
+  }
+  throw lastErr;
+}
 const MUC_HBF="8000261";
 const DB_ROUTES=[
   {name:"Bayreuth Hbf", q:"Bayreuth Hbf",  id:null},
@@ -437,11 +453,8 @@ let dbJourneys={},dbActive=false,dbInited=false,dbTimer=null;
 async function dbResolve(){
   await Promise.all(DB_ROUTES.map(async r=>{
     try{
-      const url=dbUrl(`/locations?query=${encodeURIComponent(r.q)}&results=1`);
-      console.log("[DB] resolve:",url);
-      const res=await fetch(url);
-      if(!res.ok)throw new Error(`HTTP ${res.status}`);
-      const d=await res.json();
+      console.log("[DB] resolve:",r.q);
+      const d=await dbFetch(`/locations?query=${encodeURIComponent(r.q)}&results=1`);
       console.log("[DB] resolved",r.q,"→",d[0]?.id,d[0]?.name);
       if(d[0])r.id=d[0].id;
       else throw new Error("keine Ergebnisse");
@@ -459,11 +472,8 @@ async function dbFetchAll(){
       return;
     }
     try{
-      const url=dbUrl(`/journeys?from=${MUC_HBF}&to=${encodeURIComponent(r.id)}&results=6&language=de`);
-      console.log("[DB] journey fetch:",url);
-      const res=await fetch(url);
-      if(!res.ok)throw new Error(`HTTP ${res.status}`);
-      const d=await res.json();
+      console.log("[DB] journey fetch:",r.name,r.id);
+      const d=await dbFetch(`/journeys?from=${MUC_HBF}&to=${encodeURIComponent(r.id)}&results=6&language=de`);
       console.log("[DB] journeys",r.name,"→",d.journeys?.length,"Verbindungen");
       dbJourneys[r.name]={journeys:d.journeys||[],err:null};
     }catch(e){
