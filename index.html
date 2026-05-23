@@ -42,7 +42,7 @@
     .board{display:grid;grid-template-columns:1fr 1fr;gap:1vmin 1.4vmin;align-items:start;padding:1vmin 1.5vmin 0.5vmin!important;border-right:1px solid var(--line);margin-right:2.5vmin;}
     #updated{grid-column:1 / -1;font-size:.65rem;margin-top:0.5vmin;}
     .card{padding:0.7vmin 1vmin 0.35vmin;}
-    .station{margin-bottom:0.3vmin;}
+    .station{margin-bottom:0.3vmin;gap:0 .3em;}
     .sname{font-size:clamp(.82rem,2.4vmin,1rem);}
     .thresh{font-size:.6em;}
     .row{padding:.3vmin 0;}
@@ -52,10 +52,12 @@
   }
   .card{background:var(--card);border:1px solid var(--line);border-radius:13px;
         padding:1.1vmin 1.5vmin .55vmin;overflow:hidden;position:relative;}
-  .station{display:flex;align-items:baseline;gap:.4em;margin-bottom:.55vmin;}
-  .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);flex-shrink:0;}
-  .thresh{font-size:.65em;color:var(--muted);font-weight:400;flex-shrink:0;}
-  .stoerung{margin-left:auto;min-width:0;flex:1;overflow:hidden;white-space:nowrap;
+  .station{display:grid;grid-template-columns:1fr auto;gap:0 .5em;margin-bottom:.55vmin;}
+  .sname{font-weight:600;font-size:clamp(.92rem,2.95vmin,1.16rem);grid-column:1;grid-row:1;align-self:baseline;}
+  .missed-badge{grid-column:2;grid-row:1;font-size:.65em;color:var(--muted);font-weight:500;
+                white-space:nowrap;align-self:baseline;text-align:right;}
+  .thresh{font-size:.65em;color:var(--muted);font-weight:400;grid-column:1;grid-row:2;align-self:baseline;}
+  .stoerung{grid-column:2;grid-row:2;min-width:0;overflow:hidden;white-space:nowrap;
             position:relative;height:1.25em;}
   .stoerung-inner{position:absolute;white-space:nowrap;color:var(--gelb);
                   font-size:.72em;font-weight:600;will-change:transform;
@@ -95,11 +97,12 @@
 <script>
 /* ══ Konfiguration ══════════════════════════════════════════════════ */
 const WEGE=[
-  // minMin = ab wie vielen Minuten Abfahrten gezeigt werden (versteckt "jetzt"/unerreichbare)
-  {person:"Silberhornstraße", id:"de:09162:1170",threshold:9, filterLine:"U",filterZiel:"",minMin:1},
-  {person:"Ostfriedhof",      id:"de:09162:1105",threshold:3, filterLine:"", filterZiel:"",minMin:2},
-  {person:"St.-Martin-Straße",id:"de:09162:1100",threshold:14,filterLine:"", filterZiel:"",minMin:1},
-  {person:"Kolumbusplatz",    id:"de:09162:160", threshold:11,filterLine:"U",filterZiel:"",minMin:1},
+  // threshold = Fußweg in min (laut Google Maps)
+  // minMin    = threshold - 2 (Laufpuffer: 2 min früher noch zeigen)
+  {person:"Silberhornstraße", id:"de:09162:1170",threshold:9, filterLine:"U",filterZiel:"",minMin:7},
+  {person:"Ostfriedhof",      id:"de:09162:1105",threshold:4, filterLine:"", filterZiel:"",minMin:2},
+  {person:"St.-Martin-Straße",id:"de:09162:1100",threshold:12,filterLine:"", filterZiel:"",minMin:10},
+  {person:"Kolumbusplatz",    id:"de:09162:160", threshold:10,filterLine:"U",filterZiel:"",minMin:8},
 ];
 
 
@@ -164,7 +167,7 @@ function updateRowEl(el,d,weg){
 function updateStation(weg){
   if(!state[weg.id]){
     const c=document.createElement("div");c.className="card";
-    c.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="thresh">~${weg.threshold+1} min</span><span class="stoerung"></span></div>`;
+    c.innerHTML=`<div class="station"><span class="sname">${weg.person}</span><span class="missed-badge"></span><span class="thresh">~${weg.threshold+1} min</span><span class="stoerung"></span></div>`;
     state[weg.id]={cardEl:c,rows:new Map()};
     document.getElementById("board").appendChild(c);}
   const{cardEl,rows}=state[weg.id];
@@ -177,6 +180,18 @@ function updateStation(weg){
   if(msg)msg.remove();
   let deps=raw.filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=(weg.minMin??1));
   deps.sort((a,b)=>minuten(a)-minuten(b));deps=deps.slice(0,PRO_WEG);
+  // Verpasste zählen: in Raw-Data vorhanden aber unter minMin
+  const missedDeps=raw.filter(d=>!d.cancelled&&matcht(d,weg)&&minuten(d)>=0&&minuten(d)<(weg.minMin??1));
+  const missed=missedDeps.length;
+  const threshEl=cardEl.querySelector(".thresh");
+  if(threshEl)threshEl.textContent=`~${weg.threshold+1} min`;
+  const badgeEl=cardEl.querySelector(".missed-badge");
+  if(badgeEl){
+    if(missed>0){
+      const lines=[...new Set(missedDeps.map(d=>d.label))].join(", ");
+      badgeEl.textContent=`↑${missed} (${lines})`;
+    } else badgeEl.textContent="";
+  }
   const sortedKeys=deps.map(getKey);
   const newKeySet=new Set(sortedKeys);
   // Störungen: betroffene angezeigte Linien
