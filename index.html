@@ -149,7 +149,7 @@ function fillRowEl(el,d,weg){
   const del=m<=1?`;animation-delay:${-(Date.now()%PULSE_MS)}ms`:"";
   el.innerHTML=`
     <span class="badge" style="background:${farbe(d.label,d.transportType)}">${d.label||"?"}</span>
-    <span class="dest">${d.destination||""}</span>
+    <span class="dest">${(d.destination||"").trim()}</span>
     <span class="plat">${d.platform?`Gl.${d.platform}`:""}</span>
     <span class="tcell">
       <span class="tnum" style="${m<=0?"color:var(--rot)":""}">${m<=0?"jetzt":m}</span>
@@ -342,11 +342,28 @@ async function fetchMessages(){
 }
 
 async function fetchWeather(){
-  try{const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1170&longitude=11.5720&current=temperature_2m,weather_code&timezone=Europe%2FBerlin");
-    const d=await r.json(),temp=Math.round(d.current.temperature_2m),code=d.current.weather_code;
-    const ic=[[0,"☀️"],[3,"⛅"],[48,"🌫️"],[67,"🌧️"],[77,"❄️"],[82,"🌦️"],[99,"⛈️"]];
-    document.getElementById("weather").textContent=`${(ic.find(([c])=>code<=c)||["",""])[1]} ${temp}°`;}
-  catch(e){}}
+  try{
+    const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.1170&longitude=11.5720&current=temperature_2m,weather_code,is_day&hourly=precipitation_probability,precipitation&forecast_hours=12&timezone=Europe%2FBerlin");
+    const d=await r.json();
+    const temp=Math.round(d.current.temperature_2m),code=d.current.weather_code,day=d.current.is_day===1;
+    // Tag/Nacht-Emojis
+    const icDay  =[[0,"☀️"],[2,"🌤️"],[3,"⛅"],[48,"🌫️"],[67,"🌧️"],[77,"❄️"],[82,"🌦️"],[99,"⛈️"]];
+    const icNight=[[0,"🌙"],[2,"🌙"],[3,"☁️"],[48,"🌫️"],[67,"🌧️"],[77,"❄️"],[82,"🌧️"],[99,"⛈️"]];
+    const emoji=((day?icDay:icNight).find(([c])=>code<=c)||["","☁️"])[1];
+    // Regenwarnung: erste Stunde in den nächsten 8h mit ≥50% & ≥0.2mm
+    let rain="";const H=d.hourly,now=Date.now(),limit=now+8*36e5;
+    if(H&&H.time){
+      for(let i=0;i<H.time.length;i++){
+        const t=new Date(H.time[i]).getTime();
+        if(t<now-18e5||t>limit)continue;
+        if((H.precipitation_probability?.[i]??0)>=50&&(H.precipitation?.[i]??0)>=0.2){
+          rain=t<=now+18e5?" 🌧 jetzt":` 🌧 ${new Date(H.time[i]).getHours()} Uhr`;
+          break;
+        }
+      }
+    }
+    document.getElementById("weather").textContent=`${emoji} ${temp}°${rain}`;
+  }catch(e){}}
 
 /* ══ Render-Loop ════════════════════════════════════════════════════ */
 function renderAll(){
