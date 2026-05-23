@@ -84,36 +84,11 @@
   .card-msg.err{color:var(--rot);}
 
 
-  /* ── DB Fernverkehr ── */
-  #db-btn{background:#EC0016;color:#fff;border:none;font-weight:700;cursor:pointer;
-          font-size:clamp(.82rem,2.8vmin,1.08rem);letter-spacing:.02em;
-          padding:.3em .5em;border-radius:7px;line-height:1;transition:opacity .2s;flex-shrink:0;}
-  #db-btn.active{box-shadow:0 0 0 2.5px var(--ink);}
-  .logo{cursor:pointer;transition:opacity .2s;}
-  .db-dest{font-weight:600;font-size:clamp(.86rem,2.7vmin,1.08rem);
-           margin-bottom:.4em;color:var(--ink);}
-  .db-row{display:flex;align-items:baseline;gap:.45em;
-          padding:.3em 0;border-bottom:1px solid var(--line);}
-  .db-row-cancelled{opacity:.4;}
-  .db-time{font-weight:700;font-size:clamp(.9rem,2.8vmin,1.1rem);flex-shrink:0;min-width:3em;}
-  .db-delay{color:var(--gelb);font-size:.72em;font-weight:600;flex-shrink:0;}
-  .db-badge{font-size:.68em;font-weight:700;padding:.14em .42em;border-radius:4px;
-            flex-shrink:0;white-space:nowrap;}
-  .db-ice{background:#EC0016;color:#fff;}
-  .db-re{background:#1A6B3C;color:#fff;}
-  .db-dur{color:var(--muted);font-size:.8em;flex-shrink:0;}
-  .db-chg{color:var(--muted);font-size:.73em;margin-left:auto;white-space:nowrap;}
-  .db-stoerung{overflow:hidden;white-space:nowrap;height:1.3em;
-               position:relative;margin-top:.5em;}
-  .db-stoerung-inner{position:absolute;white-space:nowrap;color:var(--gelb);
-                     font-size:.72em;line-height:1.8;
-                     animation:marquee 20s linear infinite;}
 </style>
 </head>
 <body>
   <div class="topbar">
-    <span class="logo" id="mvv-logo">MVV</span>
-    <button id="db-btn">DB</button>
+    <span class="logo">MVV</span>
     <h1 id="datum">–</h1>
     <div class="tbar-right">
       <span id="weather"></span>
@@ -122,7 +97,6 @@
     </div>
   </div>
   <div class="board" id="board"></div>
-  <div class="board" id="db-board" style="display:none"></div>
 <script>
 /* ══ Konfiguration ══════════════════════════════════════════════════ */
 const WEGE=[
@@ -422,171 +396,6 @@ setInterval(()=>{const dx=Math.floor(Math.random()*5)-2,dy=Math.floor(Math.rando
 fetchAll().then(()=>{ renderAll(); setTimeout(setMinHeights, 800); });
 setInterval(renderAll,RENDER_INT);
 setInterval(()=>fetchAll().then(renderAll),FETCH_INT);
-
-// ===== DB Fernverkehr =====
-const DB_API="https://v6.db.transport.rest";
-const DB_PROXIES=[
-  "",                                      // direkt (Fully Kiosk: CORS aus → klappt)
-  "https://api.allorigins.win/raw?url=",   // Fallback 1
-  "https://corsproxy.io/?url="              // Fallback 2
-];
-async function dbFetch(path){
-  const full=DB_API+path;
-  let lastErr;
-  for(const px of DB_PROXIES){
-    try{
-      const url=px?px+encodeURIComponent(full):full;
-      const res=await fetch(url);
-      if(!res.ok)throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    }catch(e){lastErr=e;console.warn("[DB] Proxy versagt:",px||"direkt","→",e.message);}
-  }
-  throw lastErr;
-}
-const MUC_HBF="8000261";
-const DB_ROUTES=[
-  {name:"Bayreuth Hbf", q:"Bayreuth Hbf",  id:null},
-  {name:"Jena West", q:"Jena West", id:null}
-];
-let dbJourneys={},dbActive=false,dbInited=false,dbTimer=null;
-
-async function dbResolve(){
-  await Promise.all(DB_ROUTES.map(async r=>{
-    try{
-      console.log("[DB] resolve:",r.q);
-      const d=await dbFetch(`/locations?query=${encodeURIComponent(r.q)}&results=1`);
-      console.log("[DB] resolved",r.q,"→",d[0]?.id,d[0]?.name);
-      if(d[0])r.id=d[0].id;
-      else throw new Error("keine Ergebnisse");
-    }catch(e){
-      console.error("[DB] resolve FEHLER",r.q,e);
-      r.resolveErr=e.message||String(e);
-    }
-  }));
-}
-
-async function dbFetchAll(){
-  await Promise.all(DB_ROUTES.map(async r=>{
-    if(!r.id){
-      dbJourneys[r.name]={journeys:[],err:`Station nicht aufgelöst: ${r.resolveErr||"unbekannt"}`};
-      return;
-    }
-    try{
-      console.log("[DB] journey fetch:",r.name,r.id);
-      const d=await dbFetch(`/journeys?from=${MUC_HBF}&to=${encodeURIComponent(r.id)}&results=6&language=de`);
-      console.log("[DB] journeys",r.name,"→",d.journeys?.length,"Verbindungen");
-      dbJourneys[r.name]={journeys:d.journeys||[],err:null};
-    }catch(e){
-      console.error("[DB] journey FEHLER",r.name,e);
-      dbJourneys[r.name]={journeys:[],err:e.message||String(e)};
-    }
-  }));
-  dbRender();
-}
-
-function dbFmt(iso){
-  if(!iso)return"--:--";
-  return new Date(iso).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
-}
-
-function dbDur(j){
-  const transit=j.legs.filter(l=>l.line);
-  if(!transit.length)return"–";
-  const dep=new Date(transit[0].plannedDeparture||transit[0].departure);
-  const last=j.legs[j.legs.length-1];
-  const arr=new Date(last.plannedArrival||last.arrival);
-  const m=Math.round((arr-dep)/60000);
-  if(isNaN(m)||m<0)return"–";
-  const h=Math.floor(m/60),min=m%60;
-  return h?(min?`${h}h${String(min).padStart(2,"0")}`:`${h}h`):`${m}min`;
-}
-
-function dbLineCls(prod){
-  return["nationalExpress","national"].includes(prod)?"db-ice":"db-re";
-}
-
-function dbRender(){
-  const board=document.getElementById("db-board");
-  if(!board)return;
-  board.innerHTML="";
-  DB_ROUTES.forEach(r=>{
-    const card=document.createElement("div");
-    card.className="card";
-    const {journeys=[],err=null}=dbJourneys[r.name]||{};
-    const allRemarks=new Set();
-    let rows="";
-
-    if(err){
-      rows=`<div class="card-msg err">⚠ ${err}</div>`;
-    } else if(!journeys.length){
-      rows=`<div class="card-msg">Lade…</div>`;
-    } else {
-      journeys.slice(0,5).forEach(j=>{
-        const transit=j.legs.filter(l=>l.line);
-        if(!transit.length)return;
-        const first=transit[0];
-        const prod=first.line?.product||"";
-        const lname=first.line?.name||"?";
-        const depPlan=first.plannedDeparture||first.departure;
-        const delayS=first.departureDelay;
-        const delayMin=delayS!=null?Math.round(delayS/60):null;
-        const cancelled=j.legs.some(l=>l.cancelled);
-        const changes=transit.length-1;
-        const dur=dbDur(j);
-        // Remarks sammeln
-        j.legs.forEach(l=>(l.remarks||[]).forEach(rm=>{
-          if(rm.type==="warning"||rm.type==="hint")allRemarks.add(rm.text.trim());
-        }));
-        const delayHtml=delayMin>0
-          ?`<span class="db-delay">+${delayMin}'</span>`
-          :"";
-        rows+=`<div class="db-row${cancelled?" db-row-cancelled":""}">
-  <span class="db-time">${dbFmt(depPlan)}</span>
-  ${delayHtml}
-  <span class="db-badge ${dbLineCls(prod)}">${lname}</span>
-  <span class="db-dur">${dur}</span>
-  <span class="db-chg">${changes?changes+"× Umst.":"direkt"}</span>
-</div>`;
-      });
-    }
-
-    let stoerHtml="";
-    if(allRemarks.size){
-      const txt=[...allRemarks].join("    •    ");
-      stoerHtml=`<div class="db-stoerung"><span class="db-stoerung-inner">⚠ ${txt}</span></div>`;
-    }
-
-    card.innerHTML=`<div class="db-dest">→ ${r.name}</div>${rows}${stoerHtml}`;
-    board.appendChild(card);
-  });
-}
-
-async function dbOpen(){
-  document.getElementById("board").style.display="none";
-  document.getElementById("db-board").style.display="";
-  document.getElementById("db-btn").classList.add("active");
-  document.getElementById("mvv-logo").style.opacity=".5";
-  // Stationen auflösen falls noch nicht erledigt
-  if(DB_ROUTES.some(r=>!r.id))await dbResolve();
-  await dbFetchAll();
-  if(dbTimer)clearInterval(dbTimer);
-  dbTimer=setInterval(dbFetchAll,300000);
-}
-
-function dbClose(){
-  document.getElementById("board").style.display="";
-  document.getElementById("db-board").style.display="none";
-  document.getElementById("db-btn").classList.remove("active");
-  document.getElementById("mvv-logo").style.opacity="";
-  clearInterval(dbTimer);dbTimer=null;
-}
-
-document.getElementById("db-btn").addEventListener("click",()=>{
-  dbActive=!dbActive;dbActive?dbOpen():dbClose();
-});
-document.getElementById("mvv-logo").addEventListener("click",()=>{
-  if(dbActive){dbActive=false;dbClose();}
-});
 
 </script>
 </body>
